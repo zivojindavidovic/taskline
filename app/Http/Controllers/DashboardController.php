@@ -20,7 +20,7 @@ class DashboardController extends Controller
         $myTasks = Task::where('assignee_id', $user->id)
             ->where('completed', false)
             ->whereIn('project_id', $projectIds)
-            ->with(['project', 'boardColumn'])
+            ->with(['project', 'boardColumn', 'assignee'])
             ->orderByRaw("CASE priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'med' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
             ->take(8)
             ->get();
@@ -42,16 +42,18 @@ class DashboardController extends Controller
         ];
 
         $mapTask = fn ($t) => [
-            'id'           => $t->id,
-            'key'          => $t->key,
-            'title'        => $t->title,
-            'priority'     => $t->priority,
-            'completed'    => $t->completed,
-            'due_date'     => $t->due_date,
-            'project_id'   => $t->project_id,
-            'project_name' => $t->project?->name,
-            'project_key'  => $t->project?->key,
-            'column_name'  => $t->boardColumn?->name,
+            'id'            => $t->id,
+            'key'           => $t->key,
+            'title'         => $t->title,
+            'priority'      => $t->priority,
+            'completed'     => $t->completed,
+            'due_date'      => $t->due_date,
+            'project_id'    => $t->project_id,
+            'project_name'  => $t->project?->name,
+            'project_key'   => $t->project?->key,
+            'column_name'   => $t->boardColumn?->name,
+            'column_color'  => $t->boardColumn?->color,
+            'assignee_name' => $t->assignee?->name,
         ];
 
         return Inertia::render('Dashboard', [

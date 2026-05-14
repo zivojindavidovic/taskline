@@ -1,95 +1,79 @@
 <template>
   <AppLayout>
-    <div class="px-8 py-6 flex flex-col gap-6" style="max-width:1100px;margin:0 auto">
-      <!-- Header -->
+    <div class="dash">
+      <!-- Greeting -->
       <div>
-        <h1 class="text-2xl font-semibold" style="color:var(--fg)">Good morning, {{ user.name.split(' ')[0] }}</h1>
-        <p class="text-sm mt-0.5" style="color:var(--fg-muted)">Dashboard</p>
+        <div class="dash-greeting">{{ today }}</div>
+        <h1>Good {{ timeOfDay }}, {{ firstName }}</h1>
       </div>
 
       <!-- Stats grid -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div
-          v-for="s in statsCards"
-          :key="s.label"
-          class="rounded-xl p-4 flex flex-col gap-1"
-          style="background:var(--bg-panel);border:1px solid var(--border)"
-        >
-          <p class="text-2xl font-bold" style="color:var(--fg)">{{ s.value }}</p>
-          <p class="text-xs" style="color:var(--fg-muted)">{{ s.label }}</p>
+      <div class="stat-grid">
+        <div v-for="s in statsCards" :key="s.label" class="stat">
+          <span class="label">{{ s.label }}</span>
+          <span class="value">{{ s.value }}</span>
+          <span class="delta">{{ s.delta }}</span>
         </div>
       </div>
 
-      <!-- Two-column layout -->
-      <div class="grid md:grid-cols-2 gap-4">
+      <!-- Single-column layout -->
+      <div style="display:grid;grid-template-columns:1fr;gap:16px">
         <!-- Awaiting completion -->
-        <div class="rounded-xl flex flex-col" style="background:var(--bg-panel);border:1px solid var(--border)">
-          <div class="flex items-center justify-between px-4 pt-4 pb-3" style="border-bottom:1px solid var(--border)">
-            <h2 class="text-sm font-semibold" style="color:var(--fg)">Awaiting completion</h2>
-            <span
-              v-if="awaitingCompletion.length > 0"
-              class="text-xs px-2 py-0.5 rounded-full font-medium"
-              style="background:var(--status-warn-bg);color:var(--status-warn-fg)"
-            >{{ awaitingCompletion.length }}</span>
+        <div class="list-card">
+          <div class="head">
+            <CheckIcon style="width:15px;height:15px;flex-shrink:0" />
+            <span class="title">Awaiting completion</span>
+            <span v-if="awaitingCompletion.length > 0" style="font-size:12px;color:var(--fg-subtle)">
+              {{ awaitingCompletion.length }} in Done, not confirmed
+            </span>
           </div>
-          <div class="flex flex-col divide-y overflow-auto" style="border-color:var(--border)">
-            <div
-              v-if="awaitingCompletion.length === 0"
-              class="px-4 py-6 text-sm text-center"
-              style="color:var(--fg-muted)"
-            >
-              All caught up!
-            </div>
-            <div
-              v-for="task in awaitingCompletion"
-              :key="task.id"
-              class="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-[var(--bg-hover)]"
-              @click="openTask(task)"
-            >
-              <PriorityBadge :priority="task.priority" />
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium truncate" style="color:var(--fg)">{{ task.title }}</p>
-                <p class="text-xs mt-0.5" style="color:var(--fg-muted)">{{ task.key }} · {{ task.project_name }}</p>
-              </div>
-            </div>
+          <div
+            v-if="awaitingCompletion.length === 0"
+            class="task-row"
+            style="cursor:default;justify-content:center;color:var(--fg-muted)"
+          >
+            All caught up!
+          </div>
+          <div
+            v-for="task in awaitingCompletion"
+            :key="task.id"
+            class="task-row"
+            @click="openTask(task)"
+          >
+            <span class="id">{{ task.key }}</span>
+            <span class="status-dot" style="background:var(--status-done)"></span>
+            <span class="task-title">{{ task.title }}</span>
+            <span class="meta">{{ task.assignee_name || 'Unassigned' }}</span>
           </div>
         </div>
 
         <!-- Your tasks -->
-        <div class="rounded-xl flex flex-col" style="background:var(--bg-panel);border:1px solid var(--border)">
-          <div class="px-4 pt-4 pb-3" style="border-bottom:1px solid var(--border)">
-            <h2 class="text-sm font-semibold" style="color:var(--fg)">Your tasks</h2>
+        <div class="list-card">
+          <div class="head">
+            <UserIcon style="width:15px;height:15px;flex-shrink:0" />
+            <span class="title">Your tasks</span>
+            <button class="btn ghost sm" style="display:inline-flex;align-items:center;gap:4px;padding:0 8px">
+              View all <ArrowRightIcon style="width:13px;height:13px" />
+            </button>
           </div>
-          <div class="flex flex-col divide-y overflow-auto" style="border-color:var(--border)">
-            <div
-              v-if="myTasks.length === 0"
-              class="px-4 py-6 text-sm text-center"
-              style="color:var(--fg-muted)"
-            >
-              No tasks assigned to you.
-            </div>
-            <div
-              v-for="task in myTasks"
-              :key="task.id"
-              class="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-[var(--bg-hover)]"
-              @click="openTask(task)"
-            >
-              <PriorityBadge :priority="task.priority" />
-              <div class="flex-1 min-w-0">
-                <p
-                  class="text-sm font-medium truncate"
-                  :class="{ 'line-through opacity-50': task.completed }"
-                  style="color:var(--fg)"
-                >{{ task.title }}</p>
-                <p class="text-xs mt-0.5" style="color:var(--fg-muted)">
-                  {{ task.key }}<span v-if="task.due_date"> · Due {{ formatDate(task.due_date) }}</span>
-                </p>
-              </div>
-              <span
-                class="shrink-0 text-xs px-2 py-0.5 rounded-full"
-                style="background:var(--bg-sunken);color:var(--fg-muted)"
-              >{{ task.column_name }}</span>
-            </div>
+          <div
+            v-if="myTasks.length === 0"
+            class="task-row"
+            style="cursor:default;justify-content:center;color:var(--fg-muted)"
+          >
+            No tasks assigned to you.
+          </div>
+          <div
+            v-for="task in myTasks"
+            :key="task.id"
+            class="task-row"
+            @click="openTask(task)"
+          >
+            <span class="id">{{ task.key }}</span>
+            <span class="status-dot" :style="{ background: task.column_color || 'var(--status-todo)' }"></span>
+            <span class="task-title">{{ task.title }}</span>
+            <span class="meta">{{ task.column_name }}</span>
+            <PriorityBadge :priority="task.priority" />
           </div>
         </div>
       </div>
@@ -102,6 +86,7 @@ import { computed } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
+import { CheckIcon, UserIcon, ArrowRightIcon } from '@/Components/UI/Icons.vue'
 
 const props = defineProps({
   stats:              { type: Object, default: () => ({}) },
@@ -111,21 +96,27 @@ const props = defineProps({
 
 const page = usePage()
 const user = computed(() => page.props.auth.user)
+const firstName = computed(() => user.value.name.split(' ')[0])
+
+const today = computed(() =>
+  new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+)
+
+const timeOfDay = computed(() => {
+  const h = new Date().getHours()
+  return h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening'
+})
 
 const statsCards = computed(() => [
-  { label: 'Open',                value: props.stats.open        ?? 0 },
-  { label: 'In progress',         value: props.stats.inProgress  ?? 0 },
-  { label: 'Awaiting completion', value: props.stats.awaiting    ?? 0 },
-  { label: 'Completed',           value: props.stats.completed   ?? 0 },
+  { label: 'Open tasks',          value: props.stats.open        ?? 0, delta: 'incomplete across all projects' },
+  { label: 'In progress',         value: props.stats.inProgress  ?? 0, delta: 'actively being worked on' },
+  { label: 'Awaiting completion', value: props.stats.awaiting    ?? 0, delta: 'in Done, not yet confirmed' },
+  { label: 'Completed',           value: props.stats.completed   ?? 0, delta: 'tasks marked done' },
 ])
 
 function openTask(task) {
   if (task.project_id) {
     window.location.href = route('projects.show', task.project_id) + '?task=' + task.id
   }
-}
-
-function formatDate(d) {
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 </script>
