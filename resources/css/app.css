@@ -1,0 +1,148 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design tokens ──────────────────────────────────────────────────── */
+:root {
+  --font-ui:   'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* Radii */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-xl: 12px;
+
+  --bg-app:    #fafaf9;
+  --bg-panel:  #ffffff;
+  --bg-sunken: #f4f4f2;
+  --bg-hover:  #f0f0ed;
+  --bg-active: #e8e8e3;
+
+  --border:       #e7e7e2;
+  --border-strong:#d4d4cf;
+
+  --fg:        #1a1a17;
+  --fg-muted:  #6b6b65;
+  --fg-subtle: #9a9a93;
+
+  --accent:       #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-soft:  #eef2ff;
+  --accent-fg:    #ffffff;
+
+  --status-todo:     #94948c;
+  --status-progress: #d97706;
+  --status-review:   #7c3aed;
+  --status-done:     #16a34a;
+  --status-blocked:  #dc2626;
+
+  /* Semantic status bg/fg pairs */
+  --status-active-bg:  #fef3c7;
+  --status-active-fg:  #92400e;
+  --status-done-bg:    #dcfce7;
+  --status-done-fg:    #15803d;
+  --status-warn-bg:    #fff7ed;
+  --status-warn-fg:    #c2410c;
+
+  --shadow-sm: 0 1px 2px rgba(20,20,17,0.04);
+  --shadow-md: 0 4px 12px rgba(20,20,17,0.06), 0 1px 3px rgba(20,20,17,0.04);
+  --shadow-lg: 0 12px 32px rgba(20,20,17,0.10), 0 2px 6px rgba(20,20,17,0.05);
+
+  --sidebar-w: 240px;
+  --panel-w:   480px;
+  --row-h:     32px;
+  --card-pad:  12px;
+}
+
+[data-theme='dark'] {
+  --bg-app:    #0e0e0d;
+  --bg-panel:  #18181a;
+  --bg-sunken: #131314;
+  --bg-hover:  #232326;
+  --bg-active: #2c2c30;
+
+  --border:       #26262a;
+  --border-strong:#36363b;
+
+  --fg:        #f1f1ee;
+  --fg-muted:  #9a9a95;
+  --fg-subtle: #6a6a65;
+
+  --accent:       #6366f1;
+  --accent-hover: #818cf8;
+  --accent-soft:  #1e1b3a;
+
+  --status-todo:     #8a8a85;
+  --status-progress: #f59e0b;
+  --status-review:   #a78bfa;
+  --status-done:     #22c55e;
+  --status-blocked:  #ef4444;
+
+  --status-active-bg:  #292013;
+  --status-active-fg:  #fbbf24;
+  --status-done-bg:    #0f2a18;
+  --status-done-fg:    #4ade80;
+  --status-warn-bg:    #2a1500;
+  --status-warn-fg:    #fb923c;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* ── Base ────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; }
+input, textarea, select { font-family: inherit; color: var(--fg); }
+
+::selection { background: var(--accent-soft); color: var(--fg); }
+
+/* ── Scrollbar ───────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; border: 2px solid var(--bg-app); }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+/* ── Animations ──────────────────────────────────────────────────────── */
+@keyframes slide-in-right {
+  from { transform: translateX(40px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scale-in {
+  from { transform: scale(0.96); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+@keyframes toast-in {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.animate-slide-in-right { animation: slide-in-right 180ms cubic-bezier(0.32,0.72,0,1); }
+.animate-fade-in         { animation: fade-in 120ms ease-out; }
+.animate-scale-in        { animation: scale-in 160ms cubic-bezier(0.32,0.72,0,1); }
+.animate-toast-in        { animation: toast-in 200ms cubic-bezier(0.32,0.72,0,1); }
+
+/* ── Drag-and-drop ───────────────────────────────────────────────────── */
+.card-dragging { opacity: 0.4; }
+.column-drag-over { background: var(--accent-soft) !important; }
+
+/* ── Prose in descriptions ───────────────────────────────────────────── */
+[contenteditable]:focus { outline: none; }
+[contenteditable]:empty::before { content: attr(data-placeholder); color: var(--fg-subtle); pointer-events: none; }
