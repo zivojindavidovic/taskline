@@ -333,6 +333,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { router } from '@inertiajs/vue3'
+import axios from 'axios'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import KanbanBoard from '@/Components/Board/KanbanBoard.vue'
 import TaskPanel from '@/Components/Task/TaskPanel.vue'
@@ -358,6 +359,13 @@ const props = defineProps({
   columns:       { type: Array,  default: () => [] },
   tasks:         { type: Array,  default: () => [] },
   allUsers:      { type: Array,  default: () => [] },
+  savedFilters:  {
+    type: Object,
+    default: () => ({
+      sprint_ids: [], assignee_ids: [], priorities: [], status_ids: [],
+      statuses: [], hide_completed: false, unassigned: false,
+    }),
+  },
 })
 
 const { toast } = useToast()
@@ -374,15 +382,35 @@ const showLockModal = ref(false)
 const defaultColumnId = ref(null)
 const searchQuery   = ref('')
 
-// Filters
-const showFilters      = ref(false)
-const filterRef        = ref(null)
-const filterAssignees      = ref([])
-const filterUnassigned     = ref(false)
-const filterPriorities     = ref([])
-const filterStatuses       = ref([])
-const filterTags           = ref([])
-const filterHideCompleted  = ref(false)
+// Filters — initialized from persisted savedFilters prop
+const showFilters         = ref(false)
+const filterRef           = ref(null)
+const filterAssignees     = ref([...(props.savedFilters.assignee_ids ?? [])])
+const filterUnassigned    = ref(props.savedFilters.unassigned ?? false)
+const filterPriorities    = ref([...(props.savedFilters.priorities ?? [])])
+const filterStatuses      = ref([...(props.savedFilters.statuses ?? [])])
+const filterTags          = ref([])
+const filterHideCompleted = ref(props.savedFilters.hide_completed ?? false)
+
+function debounce(fn, ms) {
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms) }
+}
+
+const persistFilters = debounce(() => {
+  axios.put(`/projects/${props.project.id}/filters`, {
+    assignee_ids:   filterAssignees.value,
+    priorities:     filterPriorities.value,
+    statuses:       filterStatuses.value,
+    hide_completed: filterHideCompleted.value,
+    unassigned:     filterUnassigned.value,
+  })
+}, 600)
+
+watch(
+  [filterAssignees, filterUnassigned, filterPriorities, filterStatuses, filterHideCompleted],
+  persistFilters,
+  { deep: true },
+)
 
 const priorities = [
   { value: 'urgent', label: 'Urgent' },
@@ -420,8 +448,7 @@ function clearFilters() {
   filterHideCompleted.value = false
 }
 
-function toggleFilter(arrRef, val) {
-  const arr = arrRef.value
+function toggleFilter(arr, val) {
   const idx = arr.indexOf(val)
   if (idx >= 0) arr.splice(idx, 1)
   else arr.push(val)

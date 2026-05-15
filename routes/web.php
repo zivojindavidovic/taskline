@@ -13,6 +13,7 @@ use App\Http\Controllers\WorkspaceMembersController;
 use App\Http\Controllers\SprintController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\TaskAttachmentController;
+use App\Http\Controllers\FilterController;
 use App\Http\Controllers\TaskController;
 use Illuminate\Support\Facades\Route;
 
@@ -32,6 +33,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/settings/members/invite', [WorkspaceMembersController::class, 'invite'])->name('settings.members.invite');
     Route::patch('/settings/members/{member}/role', [WorkspaceMembersController::class, 'updateRole'])->name('settings.members.role');
     Route::delete('/settings/members/{member}', [WorkspaceMembersController::class, 'remove'])->name('settings.members.remove');
+    Route::delete('/settings/members/invitations/{invitation}', [WorkspaceMembersController::class, 'revoke'])->name('settings.members.revoke');
 
     // Workspaces
     Route::post('/workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
@@ -40,6 +42,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Projects
     Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+
+    // Filters
+    Route::get('/projects/{project}/filters', [FilterController::class, 'show'])->name('projects.filters.show');
+    Route::put('/projects/{project}/filters', [FilterController::class, 'update'])->name('projects.filters.update');
 
     // Members
     Route::get('/projects/{project}/members', [MembersController::class, 'index'])->name('projects.members');

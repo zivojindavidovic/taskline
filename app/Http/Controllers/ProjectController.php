@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\User;
+use App\Services\FilterService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -11,6 +12,8 @@ use Inertia\Response;
 
 class ProjectController extends Controller
 {
+    public function __construct(private FilterService $filterService) {}
+
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -86,6 +89,8 @@ class ProjectController extends Controller
         $columns = $project->boardColumns()->orderBy('position')->get();
         $sprints = $project->sprints()->withCount('tasks')->orderByDesc('created_at')->get();
 
+        $savedFilters = $this->filterService->get($user->id, $project->id);
+
         $taskQuery = $project->tasks()
             ->whereNull('parent_task_id')
             ->with([
@@ -129,6 +134,7 @@ class ProjectController extends Controller
             'columns'       => $columns,
             'tasks'         => $tasks,
             'allUsers'      => $allUsers,
+            'savedFilters'  => $savedFilters,
         ]);
     }
 }

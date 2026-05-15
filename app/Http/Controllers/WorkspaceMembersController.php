@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\WorkspaceInvitation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,20 +21,23 @@ class WorkspaceMembersController extends Controller
         $members = $workspace->users()
             ->get()
             ->map(fn ($m) => [
-                'id'    => $m->id,
-                'name'  => $m->name,
-                'email' => $m->email,
-                'role'  => $m->pivot->role,
+                'id'     => $m->id,
+                'name'   => $m->name,
+                'email'  => $m->email,
+                'role'   => $m->pivot->role,
+                'joined' => $m->pivot->created_at?->format('M j, Y') ?? '—',
             ]);
 
-        $owner = $workspace->owner;
+        $owner     = $workspace->owner;
         $memberIds = $members->pluck('id')->all();
+
         if (!in_array($owner->id, $memberIds)) {
             $members = collect([[
-                'id'    => $owner->id,
-                'name'  => $owner->name,
-                'email' => $owner->email,
-                'role'  => 'owner',
+                'id'     => $owner->id,
+                'name'   => $owner->name,
+                'email'  => $owner->email,
+                'role'   => 'owner',
+                'joined' => $workspace->created_at->format('M j, Y'),
             ]])->concat($members);
         } else {
             $members = $members->map(fn ($m) => $m['id'] === $owner->id
@@ -42,9 +46,21 @@ class WorkspaceMembersController extends Controller
             );
         }
 
+        $pending = WorkspaceInvitation::where('workspace_id', $workspace->id)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn ($i) => [
+                'id'    => $i->id,
+                'email' => $i->email,
+                'role'  => ucfirst($i->role),
+                'sent'  => $i->created_at->format('M j'),
+            ]);
+
         return Inertia::render('WorkspaceMembers', [
-            'members' => $members->values(),
-            'isOwner' => $workspace->owner_id === $user->id,
+            'members'    => $members->values(),
+            'pending'    => $pending,
+            'isOwner'    => $workspace->owner_id === $user->id,
+            'authUserId' => $user->id,
         ]);
     }
 
@@ -56,19 +72,42 @@ class WorkspaceMembersController extends Controller
         abort_unless($workspace && $workspace->owner_id === $user->id, 403);
 
         $data = $request->validate([
-            'email' => 'required|email|exists:users,email',
-            'role'  => 'required|in:admin,member',
+            'email' => 'required|email',
+            'role'  => 'required|in:admin,member,viewer',
         ]);
 
-        $invitee = User::where('email', $data['email'])->first();
-
-        if ($workspace->users()->where('users.id', $invitee->id)->exists()) {
+        $existingUser = User::where('email', $data['email'])->first();
+        if ($existingUser && $workspace->users()->where('users.id', $existingUser->id)->exists()) {
             return back()->withErrors(['email' => 'This user is already a member of the workspace.']);
         }
 
-        $workspace->users()->attach($invitee->id, ['role' => $data['role']]);
+        if (WorkspaceInvitation::where('workspace_id', $workspace->id)
+                ->where('email', $data['email'])->exists()) {
+            return back()->withErrors(['email' => 'An invitation has already been sent to this email.']);
+        }
 
-        return back()->with('success', "{$invitee->name} added to workspace.");
+        WorkspaceInvitation::create([
+            'workspace_id' => $workspace->id,
+            'email'        => $data['email'],
+            'role'         => $data['role'],
+            'invited_by'   => $user->id,
+        ]);
+
+        return back()->with('success', "Invitation sent to {$data['email']}.");
+    }
+
+    public function revoke(Request $request, int $invitation): RedirectResponse
+    {
+        $user      = $request->user();
+        $workspace = $user->currentWorkspace;
+
+        abort_unless($workspace && $workspace->owner_id === $user->id, 403);
+
+        WorkspaceInvitation::where('id', $invitation)
+            ->where('workspace_id', $workspace->id)
+            ->delete();
+
+        return back()->with('success', 'Invitation revoked.');
     }
 
     public function updateRole(Request $request, int $member): RedirectResponse
@@ -78,7 +117,7 @@ class WorkspaceMembersController extends Controller
 
         abort_unless($workspace && $workspace->owner_id === $user->id, 403);
 
-        $data = $request->validate(['role' => 'required|in:admin,member']);
+        $data = $request->validate(['role' => 'required|in:admin,member,viewer']);
 
         $workspace->users()->updateExistingPivot($member, ['role' => $data['role']]);
 
