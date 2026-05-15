@@ -2,7 +2,7 @@
   <button
     type="button"
     :disabled="disabled"
-    class="flex items-center gap-2 w-full text-left px-2 py-1.5 text-sm rounded transition-colors"
+    class="flex items-center gap-2 w-full text-left px-2 py-1.5 text-[13px] rounded transition-colors"
     :class="[
       danger ? 'text-red-600 hover:bg-red-50' : '',
       disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--bg-hover)]',

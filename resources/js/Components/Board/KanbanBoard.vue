@@ -1,5 +1,5 @@
 <template>
-  <div class="flex gap-3 px-5 py-4 overflow-x-auto overflow-y-hidden h-full items-start">
+  <div class="board">
     <BoardColumn
       v-for="col in columns"
       :key="col.id"
@@ -17,36 +17,30 @@
     />
 
     <!-- Add column -->
-    <div v-if="!locked" class="shrink-0 w-[280px]">
-      <div
-        v-if="!addingColumn"
-        class="flex items-center justify-center gap-2 h-10 rounded-lg border border-dashed text-sm cursor-pointer transition-colors hover:bg-[var(--bg-hover)]"
-        style="border-color:var(--border-strong);color:var(--fg-muted)"
-        @click="addingColumn = true"
-      >
+    <template v-if="!locked">
+      <button v-if="!addingColumn" type="button" class="add-column" @click="addingColumn = true">
         <PlusIcon class="w-4 h-4" /> Add column
-      </div>
-      <div v-else class="rounded-lg border p-2 flex flex-col gap-2" style="border-color:var(--border);background:var(--bg-sunken)">
+      </button>
+      <div v-else class="column" style="padding:8px;gap:8px;display:flex;flex-direction:column;">
         <input
           ref="newColInput"
           v-model="newColName"
-          class="w-full h-8 px-3 rounded border text-sm"
-          style="border-color:var(--border);background:var(--bg-panel);color:var(--fg)"
+          class="input"
           placeholder="Column name…"
           @keydown.enter="submitNewCol"
           @keydown.escape="cancelNewCol"
         />
-        <div class="flex justify-end gap-1.5">
-          <button type="button" class="btn-ghost text-sm px-3 h-7 rounded" @click="cancelNewCol">Cancel</button>
+        <div style="display:flex;justify-content:flex-end;gap:6px;">
+          <button type="button" class="btn ghost sm" @click="cancelNewCol">Cancel</button>
           <button
             type="button"
             :disabled="!newColName.trim()"
-            class="btn-primary text-sm px-3 h-7 rounded"
+            class="btn primary sm"
             @click="submitNewCol"
           >Add</button>
         </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -108,24 +102,3 @@ function cancelNewCol() {
 }
 </script>
 
-<style scoped>
-.btn-ghost {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--fg-muted);
-  cursor: pointer;
-  transition: background 80ms;
-}
-.btn-ghost:hover { background: var(--bg-hover); }
-
-.btn-primary {
-  background: var(--accent);
-  border: none;
-  color: var(--accent-fg);
-  cursor: pointer;
-  font-weight: 500;
-  transition: background 80ms;
-}
-.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-</style>

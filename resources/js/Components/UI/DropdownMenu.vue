@@ -14,16 +14,18 @@
 
     <div
       v-if="open"
-      class="absolute z-50 rounded-lg py-1 min-w-[180px]"
+      class="absolute z-50 min-w-[180px]"
       :style="{
         top: 'calc(100% + 4px)',
         [align === 'right' ? 'right' : 'left']: 0,
         width: width ? width + 'px' : undefined,
         background: 'var(--bg-panel)',
         border: '1px solid var(--border)',
+        borderRadius: 'var(--r-md)',
         boxShadow: 'var(--shadow-lg)',
+        padding: '4px',
       }"
-      @click.stop
+      @click="onInnerClick"
     >
       <slot :close="close" />
     </div>
@@ -43,6 +45,15 @@ const container = ref(null)
 
 function toggle() { open.value = !open.value }
 function close()  { open.value = false }
+
+function onInnerClick(e) {
+  e.stopPropagation()
+  // Close when a button (menu item) is clicked, unless it or an ancestor is marked keep-open
+  const btn = e.target.closest('button')
+  if (btn && !e.target.closest('[data-keep-open]')) {
+    open.value = false
+  }
+}
 
 function onOutsideClick(e) {
   if (container.value && !container.value.contains(e.target)) {

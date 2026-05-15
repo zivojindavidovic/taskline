@@ -71,11 +71,12 @@ class ProjectController extends Controller
             403
         );
 
-        $sprintId = $request->query('sprint');
+        $sprintId  = $request->query('sprint');
         $isBacklog = $request->query('backlog') === '1';
+        $isAll     = $request->query('all') === '1';
 
         $sprint = null;
-        if (!$isBacklog) {
+        if (!$isBacklog && !$isAll) {
             $sprint = $sprintId
                 ? $project->sprints()->findOrFail($sprintId)
                 : $project->sprints()->where('status', 'active')->first()
@@ -83,7 +84,7 @@ class ProjectController extends Controller
         }
 
         $columns = $project->boardColumns()->orderBy('position')->get();
-        $sprints = $project->sprints()->orderByDesc('created_at')->get();
+        $sprints = $project->sprints()->withCount('tasks')->orderByDesc('created_at')->get();
 
         $taskQuery = $project->tasks()
             ->whereNull('parent_task_id')
@@ -99,11 +100,17 @@ class ProjectController extends Controller
                 'auditLogs.user:id,name',
                 'completedByUser:id,name',
                 'subtasks' => fn ($q) => $q->with(['assignee:id,name,email', 'boardColumn:id,name,color']),
+                'attachments' => fn ($q) => $q->latest(),
+                'attachments.uploader:id,name',
             ]);
 
-        $tasks = $isBacklog
-            ? $taskQuery->whereNull('sprint_id')->get()
-            : ($sprint ? $taskQuery->where('sprint_id', $sprint->id)->get() : collect());
+        if ($isAll) {
+            $tasks = $taskQuery->get();
+        } elseif ($isBacklog) {
+            $tasks = $taskQuery->whereNull('sprint_id')->get();
+        } else {
+            $tasks = $sprint ? $taskQuery->where('sprint_id', $sprint->id)->get() : collect();
+        }
 
         $workspace = $project->workspace;
         $members = $workspace->users()->get(['users.id', 'users.name', 'users.email']);
@@ -117,6 +124,7 @@ class ProjectController extends Controller
             'project'       => $project->only(['id', 'name', 'key', 'color']),
             'currentSprint' => $sprint,
             'isBacklog'     => $isBacklog,
+            'isAll'         => $isAll,
             'sprints'       => $sprints,
             'columns'       => $columns,
             'tasks'         => $tasks,

@@ -1,191 +1,204 @@
 <template>
   <AppLayout>
     <!-- Top bar: project name + search + new task -->
-    <div
-      class="flex items-center gap-3 px-5 py-2.5 shrink-0"
-      style="border-bottom:1px solid var(--border);background:var(--bg-panel)"
-    >
-      <span class="w-3 h-3 rounded-full shrink-0" :style="{ background: project.color }" />
-      <h1 class="text-sm font-semibold shrink-0" style="color:var(--fg)">{{ project.name }}</h1>
-
-      <div class="h-4 w-px mx-1 shrink-0" style="background:var(--border)" />
-
-      <!-- Search -->
-      <div class="flex items-center gap-2 flex-1 max-w-xs px-2.5 h-8 rounded-lg" style="border:1px solid var(--border);background:var(--bg-sunken)">
-        <SearchIcon class="w-3.5 h-3.5 shrink-0" style="color:var(--fg-muted)" />
-        <input
-          v-model="searchQuery"
-          class="flex-1 text-sm bg-transparent border-none outline-none"
-          style="color:var(--fg)"
-          placeholder="Search tasks..."
-        />
+    <div class="topbar">
+      <div class="crumbs">
+        <span class="crumb-dot" :style="{ background: project.color }" />
+        <span class="crumb-current">{{ project.name }}</span>
       </div>
 
-      <div class="flex-1" />
+      <!-- Search -->
+      <div class="search-wrap">
+        <SearchIcon class="search-icon" />
+        <input
+          v-model="searchQuery"
+          class="search-input"
+          placeholder="Search tasks…"
+        />
+      </div>
 
       <!-- New task button -->
       <button
         v-if="!currentSprint?.locked || isBacklog"
         type="button"
-        class="btn-primary h-8 px-3 text-sm rounded-lg flex items-center gap-1.5"
+        class="btn-secondary"
         @click="openNewTask(null)"
       >
-        <PlusIcon class="w-3.5 h-3.5" /> New task
-        <kbd class="ml-1 text-[10px] px-1 rounded" style="background:rgba(255,255,255,.15)">C</kbd>
+        <PlusIcon style="width:14px;height:14px" /> New task
+        <span class="kbd-chip">C</span>
       </button>
     </div>
 
     <!-- Sprint header bar -->
-    <div
-      class="flex items-center gap-2 px-5 py-2 shrink-0"
-      style="border-bottom:1px solid var(--border);background:var(--bg-app)"
-    >
+    <div class="sprint-header-row">
       <!-- Sprint picker -->
-      <DropdownMenu>
+      <DropdownMenu :width="280">
         <template #trigger>
-          <button type="button" class="sprint-btn">
-            <LightningIcon
-              class="w-3.5 h-3.5 shrink-0"
-              :style="{ color: isBacklog ? 'var(--fg-muted)' : currentSprint?.locked ? 'var(--fg-muted)' : 'var(--accent)' }"
+          <button type="button" class="sprint-picker-btn">
+            <component
+              :is="isAll ? ListIcon : isBacklog ? InboxIcon : LightningIcon"
+              :style="{ color: isAll || isBacklog ? 'var(--fg-muted)' : currentSprint?.locked ? 'var(--status-progress)' : 'var(--fg-muted)' }"
             />
-            {{ isBacklog ? 'Backlog' : (currentSprint?.name ?? 'No sprint') }}
+            <span class="sprint-label">{{ isAll ? 'All sprints' : isBacklog ? 'Backlog' : (currentSprint?.name ?? 'No sprint') }}</span>
             <span
-              v-if="currentSprint?.locked"
-              class="text-[10px] px-1.5 py-0.5 rounded font-medium ml-0.5"
-              style="background:var(--bg-sunken);color:var(--fg-muted)"
-            >Locked</span>
-            <ChevronIcon class="w-3.5 h-3.5 ml-0.5" />
+              v-if="currentSprint?.locked && !isAll && !isBacklog"
+              class="lock-pill-badge"
+            ><LockIcon style="width:11px;height:11px" /> Locked</span>
+            <ChevronIcon style="color:var(--fg-subtle);margin-left:auto" />
           </button>
         </template>
-        <div class="py-1">
+
+        <div class="sprint-dd-label">Filter by sprint</div>
+
+        <MenuItem @click="switchToAll">
+          <span class="sprint-dd-check"><CheckIcon v-if="isAll" style="width:14px;height:14px;color:var(--accent)" /></span>
+          <ListIcon />
+          <span style="flex:1">All sprints</span>
+          <span class="sprint-dd-count">{{ tasks.length }}</span>
+        </MenuItem>
+
+        <MenuItem @click="switchToBacklog">
+          <span class="sprint-dd-check"><CheckIcon v-if="isBacklog" style="width:14px;height:14px;color:var(--accent)" /></span>
+          <InboxIcon />
+          <span style="flex:1">Backlog <span style="color:var(--fg-muted);font-weight:400">(no sprint)</span></span>
+          <span class="sprint-dd-count">{{ backlogCount }}</span>
+        </MenuItem>
+
+        <template v-if="sprints.length">
+          <div class="sprint-dd-divider" />
+          <div class="sprint-dd-label">Sprints in {{ project.name }}</div>
           <MenuItem v-for="s in sprints" :key="s.id" @click="switchSprint(s.id)">
-            <CheckIcon v-if="s.id === currentSprint?.id && !isBacklog" class="w-3.5 h-3.5" style="color:var(--accent)" />
-            <span v-else class="w-3.5 h-3.5 inline-block" />
-            <LightningIcon class="w-3.5 h-3.5 shrink-0" style="color:var(--accent)" />
-            <span class="flex-1">{{ s.name }}</span>
-            <span class="ml-2 text-xs" style="color:var(--fg-muted)">{{ s.status }}</span>
-            <LockIcon v-if="s.locked" class="w-3 h-3 ml-1" style="color:var(--fg-muted)" />
+            <span class="sprint-dd-check"><CheckIcon v-if="s.id === currentSprint?.id && !isAll && !isBacklog" style="width:14px;height:14px;color:var(--accent)" /></span>
+            <LightningIcon />
+            <span style="flex:1">{{ s.name }}</span>
+            <LockIcon v-if="s.locked" style="width:11px;height:11px;color:var(--fg-subtle);flex-shrink:0" />
+            <span v-if="s.start_date || s.end_date" class="sprint-dd-count">{{ fmtSprintDates(s) }}</span>
           </MenuItem>
-          <div class="h-px my-1" style="background:var(--border)" />
-          <MenuItem @click="switchToBacklog">
-            <CheckIcon v-if="isBacklog" class="w-3.5 h-3.5" style="color:var(--accent)" />
-            <span v-else class="w-3.5 h-3.5 inline-block" />
-            <span style="color:var(--fg-muted)">📋</span>
-            <span class="flex-1">Backlog</span>
-            <span class="ml-2 text-xs" style="color:var(--fg-muted)">no sprint</span>
-          </MenuItem>
-          <div class="h-px my-1" style="background:var(--border)" />
-          <MenuItem @click="showNewSprint = true">
-            <PlusIcon class="w-3.5 h-3.5" style="color:var(--accent)" />
-            <span style="color:var(--accent)">New sprint</span>
-          </MenuItem>
-        </div>
+        </template>
+
+        <div class="sprint-dd-divider" />
+        <MenuItem @click="showNewSprint = true">
+          <PlusIcon />
+          <span>New sprint</span>
+        </MenuItem>
       </DropdownMenu>
 
       <!-- Sprint meta: dates + days remaining -->
-      <div v-if="currentSprint" class="flex items-center gap-1 text-xs" style="color:var(--fg-muted)">
+      <div v-if="currentSprint && !isAll && !isBacklog" class="sprint-meta-row">
         <span>{{ sprintDateRange }}</span>
-        <span v-if="daysRemaining !== null">·</span>
-        <span v-if="daysRemaining !== null" :style="{ color: daysRemaining <= 3 ? '#ef4444' : 'var(--fg-muted)' }">
-          {{ daysRemaining > 0 ? `${daysRemaining}d remaining` : daysRemaining === 0 ? 'Ends today' : 'Ended' }}
+        <span v-if="daysRemaining !== null" class="days-pill" :style="daysRemainingStyle">
+          {{ daysRemainingLabel }}
         </span>
       </div>
-
-      <div class="flex-1" />
+      <span v-if="isBacklog" class="sprint-meta-text">Tasks not assigned to a sprint</span>
+      <span v-if="isAll" class="sprint-meta-text">Every task in {{ project.name }}</span>
 
       <!-- Filters -->
       <div class="relative" ref="filterRef">
         <button
           type="button"
-          class="header-btn"
-          :class="{ 'header-btn--active': hasActiveFilters }"
+          class="filter-trigger-btn"
           @click="showFilters = !showFilters"
         >
-          <FilterIcon class="w-3.5 h-3.5" /> Filters
-          <span v-if="hasActiveFilters" class="filter-dot" />
+          <FilterIcon style="width:14px;height:14px" /> Filters
+          <span v-if="activeFilterCount > 0" class="filter-count-badge">{{ activeFilterCount }}</span>
         </button>
 
         <div v-if="showFilters" class="filter-panel">
-          <div class="filter-section">
-            <p class="filter-section-label">Assignee</p>
-            <div class="filter-options">
-              <label class="filter-option">
-                <input type="checkbox" :value="null" v-model="filterUnassigned" class="filter-check" />
-                <span class="filter-avatar-placeholder">?</span>
-                <span>Unassigned</span>
-              </label>
-              <label v-for="u in allUsers" :key="u.id" class="filter-option">
-                <input type="checkbox" :value="u.id" v-model="filterAssignees" class="filter-check" />
-                <Avatar :name="u.name" size="sm" />
-                <span>{{ u.name }}</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="filter-divider" />
-
-          <div class="filter-section">
-            <p class="filter-section-label">Priority</p>
-            <div class="filter-options">
-              <label v-for="p in priorities" :key="p.value" class="filter-option">
-                <input type="checkbox" :value="p.value" v-model="filterPriorities" class="filter-check" />
-                <PriorityBadge :priority="p.value" />
-                <span>{{ p.label }}</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="filter-divider" />
-
-          <div class="filter-section">
-            <p class="filter-section-label">Status</p>
-            <div class="filter-options">
-              <label class="filter-option">
-                <input type="checkbox" value="open" v-model="filterStatuses" class="filter-check" />
-                <span class="status-dot" style="background:#6366f1" />
-                <span>Open</span>
-              </label>
-              <label class="filter-option">
-                <input type="checkbox" value="completed" v-model="filterStatuses" class="filter-check" />
-                <span class="status-dot" style="background:var(--status-done)" />
-                <span>Completed</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="filter-divider" />
-
-          <button v-if="hasActiveFilters" type="button" class="filter-clear" @click="clearFilters">
-            Clear all filters
+          <!-- Assignee -->
+          <div class="filter-panel-label">Assignee</div>
+          <button type="button" class="filter-menu-item" @click="filterUnassigned = !filterUnassigned">
+            <CheckIcon v-if="filterUnassigned" style="width:14px;height:14px;color:var(--accent);flex-shrink:0" />
+            <span v-else style="width:14px;flex-shrink:0;display:inline-block" />
+            <span class="filter-avatar-placeholder">?</span>
+            <span>Unassigned</span>
           </button>
+          <button v-for="u in allUsers" :key="u.id" type="button" class="filter-menu-item" @click="toggleFilter(filterAssignees, u.id)">
+            <CheckIcon v-if="filterAssignees.includes(u.id)" style="width:14px;height:14px;color:var(--accent);flex-shrink:0" />
+            <span v-else style="width:14px;flex-shrink:0;display:inline-block" />
+            <Avatar :name="u.name" size="sm" />
+            <span>{{ u.name }}</span>
+          </button>
+
+          <div class="filter-divider" />
+
+          <!-- Priority -->
+          <div class="filter-panel-label">Priority</div>
+          <button v-for="p in priorities" :key="p.value" type="button" class="filter-menu-item" @click="toggleFilter(filterPriorities, p.value)">
+            <CheckIcon v-if="filterPriorities.includes(p.value)" style="width:14px;height:14px;color:var(--accent);flex-shrink:0" />
+            <span v-else style="width:14px;flex-shrink:0;display:inline-block" />
+            <PriorityBadge :priority="p.value" />
+            <span>{{ p.label }}</span>
+          </button>
+
+          <template v-if="availableTags.length">
+            <div class="filter-divider" />
+            <div class="filter-panel-label">Tags</div>
+            <button v-for="tag in availableTags" :key="tag" type="button" class="filter-menu-item" @click="toggleFilter(filterTags, tag)">
+              <CheckIcon v-if="filterTags.includes(tag)" style="width:14px;height:14px;color:var(--accent);flex-shrink:0" />
+              <span v-else style="width:14px;flex-shrink:0;display:inline-block" />
+              <span class="filter-tag-chip">{{ tag }}</span>
+            </button>
+          </template>
+
+          <div class="filter-divider" />
+
+          <!-- Status -->
+          <div class="filter-panel-label">Status</div>
+          <button type="button" class="filter-menu-item" @click="filterHideCompleted = !filterHideCompleted">
+            <CheckIcon v-if="filterHideCompleted" style="width:14px;height:14px;color:var(--accent);flex-shrink:0" />
+            <span v-else style="width:14px;flex-shrink:0;display:inline-block" />
+            <span style="flex:1">Hide completed tasks</span>
+          </button>
+          <button type="button" class="filter-menu-item" @click="toggleFilter(filterStatuses, 'open')">
+            <CheckIcon v-if="filterStatuses.includes('open')" style="width:14px;height:14px;color:var(--accent);flex-shrink:0" />
+            <span v-else style="width:14px;flex-shrink:0;display:inline-block" />
+            <span class="status-dot" style="background:#6366f1" />
+            <span>Open</span>
+          </button>
+          <button type="button" class="filter-menu-item" @click="toggleFilter(filterStatuses, 'completed')">
+            <CheckIcon v-if="filterStatuses.includes('completed')" style="width:14px;height:14px;color:var(--accent);flex-shrink:0" />
+            <span v-else style="width:14px;flex-shrink:0;display:inline-block" />
+            <span class="status-dot" style="background:var(--status-done)" />
+            <span>Completed</span>
+          </button>
+
+          <template v-if="hasActiveFilters">
+            <div class="filter-divider" />
+            <button type="button" class="filter-menu-item" style="color:var(--status-blocked)" @click="clearFilters">
+              Clear all filters
+            </button>
+          </template>
         </div>
       </div>
 
+      <span style="flex:1" />
+
       <!-- View toggle -->
-      <div class="flex rounded-lg overflow-hidden" style="border:1px solid var(--border)">
+      <div class="view-toggle">
         <button
           type="button"
-          class="view-btn"
+          class="view-toggle-btn"
           :class="{ active: view === 'board' }"
           @click="view = 'board'"
-        ><BoardIcon class="w-3.5 h-3.5" /> Board</button>
+        ><BoardIcon style="width:14px;height:14px" /> Board</button>
         <button
           type="button"
-          class="view-btn"
+          class="view-toggle-btn"
           :class="{ active: view === 'list' }"
           @click="view = 'list'"
-        ><ListIcon class="w-3.5 h-3.5" /> List</button>
+        ><ListIcon style="width:14px;height:14px" /> List</button>
       </div>
 
       <!-- Lock / Unlock sprint -->
       <template v-if="currentSprint && !currentSprint.locked">
-        <button type="button" class="header-btn" @click="showLockModal = true">
-          <LockIcon class="w-3.5 h-3.5" /> Lock sprint
+        <button type="button" class="btn-secondary" @click="showLockModal = true">
+          <LockIcon style="width:14px;height:14px" /> Lock sprint
         </button>
       </template>
       <template v-else-if="currentSprint?.locked">
-        <button type="button" class="header-btn" @click="unlockSprint">
-          <LockIcon class="w-3.5 h-3.5" /> Unlock sprint
+        <button type="button" class="btn-secondary" @click="unlockSprint">
+          <LockIcon style="width:14px;height:14px" /> Unlock
         </button>
       </template>
     </div>
@@ -201,7 +214,7 @@
     </div>
 
     <!-- Board view -->
-    <div v-if="view === 'board'" class="flex-1 overflow-hidden">
+    <div v-if="view === 'board'" class="flex-1 overflow-hidden flex flex-col">
       <KanbanBoard
         :columns="filteredColumns"
         :tasks="filteredTasks"
@@ -283,6 +296,8 @@
       @reply="postReply"
       @subtask="addSubtask"
       @subtaskToggle="toggleSubtask"
+      @attachmentUpload="uploadAttachment"
+      @attachmentRemove="removeAttachment"
     />
 
     <!-- New task panel -->
@@ -330,7 +345,7 @@ import Avatar from '@/Components/UI/Avatar.vue'
 import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
 import {
   ChevronIcon, CheckIcon, LockIcon, PlusIcon, BoardIcon, ListIcon,
-  LightningIcon, FilterIcon, SearchIcon,
+  LightningIcon, FilterIcon, SearchIcon, InboxIcon,
 } from '@/Components/UI/Icons.vue'
 import { useToast } from '@/composables/useToast'
 
@@ -338,6 +353,7 @@ const props = defineProps({
   project:       { type: Object, required: true },
   currentSprint: { type: Object, default: null },
   isBacklog:     { type: Boolean, default: false },
+  isAll:         { type: Boolean, default: false },
   sprints:       { type: Array,  default: () => [] },
   columns:       { type: Array,  default: () => [] },
   tasks:         { type: Array,  default: () => [] },
@@ -345,6 +361,10 @@ const props = defineProps({
 })
 
 const { toast } = useToast()
+
+// Local tasks mirror — updated optimistically on drag-drop so the board
+// doesn't blink while waiting for the Inertia round-trip.
+const localTasks = ref([...props.tasks])
 
 const view          = ref('board')
 const activeTask    = ref(null)
@@ -355,12 +375,14 @@ const defaultColumnId = ref(null)
 const searchQuery   = ref('')
 
 // Filters
-const showFilters     = ref(false)
-const filterRef       = ref(null)
-const filterAssignees = ref([])
-const filterUnassigned = ref(false)
-const filterPriorities = ref([])
-const filterStatuses  = ref([])
+const showFilters      = ref(false)
+const filterRef        = ref(null)
+const filterAssignees      = ref([])
+const filterUnassigned     = ref(false)
+const filterPriorities     = ref([])
+const filterStatuses       = ref([])
+const filterTags           = ref([])
+const filterHideCompleted  = ref(false)
 
 const priorities = [
   { value: 'urgent', label: 'Urgent' },
@@ -369,18 +391,40 @@ const priorities = [
   { value: 'low',    label: 'Low' },
 ]
 
-const hasActiveFilters = computed(() =>
-  filterAssignees.value.length > 0 ||
-  filterUnassigned.value ||
-  filterPriorities.value.length > 0 ||
-  filterStatuses.value.length > 0
+// Collect all unique tags across tasks for the filter panel
+const availableTags = computed(() => {
+  const set = new Set()
+  localTasks.value.forEach(t => t.tags?.forEach(tag => set.add(tag)))
+  return Array.from(set).sort()
+})
+
+const activeFilterCount = computed(() =>
+  filterAssignees.value.length +
+  (filterUnassigned.value ? 1 : 0) +
+  filterPriorities.value.length +
+  filterStatuses.value.length +
+  filterTags.value.length +
+  (filterHideCompleted.value ? 1 : 0)
 )
 
+const hasActiveFilters = computed(() => activeFilterCount.value > 0)
+
+const backlogCount = computed(() => localTasks.value.filter(t => !t.sprint_id).length)
+
 function clearFilters() {
-  filterAssignees.value = []
-  filterUnassigned.value = false
-  filterPriorities.value = []
-  filterStatuses.value = []
+  filterAssignees.value     = []
+  filterUnassigned.value    = false
+  filterPriorities.value    = []
+  filterStatuses.value      = []
+  filterTags.value          = []
+  filterHideCompleted.value = false
+}
+
+function toggleFilter(arrRef, val) {
+  const arr = arrRef.value
+  const idx = arr.indexOf(val)
+  if (idx >= 0) arr.splice(idx, 1)
+  else arr.push(val)
 }
 
 // Close filter panel when clicking outside
@@ -392,8 +436,9 @@ function onClickOutside(e) {
 onMounted(() => document.addEventListener('mousedown', onClickOutside))
 onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 
-// Keep activeTask in sync when Inertia refreshes props.tasks
+// Keep localTasks + activeTask in sync when Inertia refreshes props.tasks
 watch(() => props.tasks, (tasks) => {
+  localTasks.value = tasks
   if (activeTask.value) {
     const updated = tasks.find(t => t.id === activeTask.value.id)
     if (updated) activeTask.value = updated
@@ -403,7 +448,7 @@ watch(() => props.tasks, (tasks) => {
 // Open a task panel
 function openTask(idOrObj) {
   const id = typeof idOrObj === 'object' ? idOrObj.id : idOrObj
-  const task = props.tasks.find(t => t.id === id) ?? null
+  const task = localTasks.value.find(t => t.id === id) ?? null
   activeTask.value = task
   const url = new URL(window.location.href)
   url.searchParams.set('task', id)
@@ -420,7 +465,7 @@ function closeTask() {
 // Open task from URL param on load
 const urlTask = new URLSearchParams(window.location.search).get('task')
 if (urlTask) {
-  const t = props.tasks.find(t => t.id === parseInt(urlTask))
+  const t = localTasks.value.find(t => t.id === parseInt(urlTask))
   if (t) activeTask.value = t
 }
 
@@ -462,9 +507,32 @@ const daysRemaining = computed(() => {
   return diff
 })
 
+const daysRemainingLabel = computed(() => {
+  const d = daysRemaining.value
+  if (d === null) return ''
+  if (d > 0) return `${d}d remaining`
+  if (d === 0) return 'Ends today'
+  return 'Ended'
+})
+
+const daysRemainingStyle = computed(() => {
+  const d = daysRemaining.value
+  if (d === null) return ''
+  if (d <= 0) return 'background:color-mix(in oklab,#ef4444 12%,transparent);color:#ef4444'
+  if (d <= 3) return 'background:color-mix(in oklab,#f59e0b 12%,transparent);color:#d97706'
+  return 'background:var(--bg-active);color:var(--fg-muted)'
+})
+
+function fmtSprintDates(s) {
+  const fmt = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
+  const start = fmt(s.start_date)
+  const end = fmt(s.end_date)
+  return start && end ? `${start} – ${end}` : start || end
+}
+
 // Filtered tasks/columns based on search + filters
 const filteredTasks = computed(() => {
-  let tasks = props.tasks
+  let tasks = localTasks.value
 
   // Search
   if (searchQuery.value.trim()) {
@@ -498,6 +566,18 @@ const filteredTasks = computed(() => {
     })
   }
 
+  // Tags filter
+  if (filterTags.value.length > 0) {
+    tasks = tasks.filter(t =>
+      filterTags.value.some(tag => t.tags?.includes(tag))
+    )
+  }
+
+  // Hide completed filter
+  if (filterHideCompleted.value) {
+    tasks = tasks.filter(t => !t.completed)
+  }
+
   return tasks
 })
 
@@ -527,17 +607,31 @@ function switchToBacklog() {
   router.get(route('projects.show', props.project.id), { backlog: '1' }, { preserveScroll: false })
 }
 
+function switchToAll() {
+  router.get(route('projects.show', props.project.id), { all: '1' }, { preserveScroll: false })
+}
+
 function unlockSprint() {
   router.post(route('sprints.unlock', props.currentSprint.id), {}, { preserveScroll: true })
 }
 
 function moveTask(taskId, columnId) {
+  // Optimistic: update local copy immediately so board doesn't blink
+  const prevColumnId = localTasks.value.find(t => t.id === taskId)?.board_column_id
+  const task = localTasks.value.find(t => t.id === taskId)
+  if (task) task.board_column_id = columnId
+
   router.post(route('tasks.move', taskId), { board_column_id: columnId }, {
     preserveScroll: true,
+    preserveState: true,
     onSuccess: () => {
       if (activeTask.value?.id === taskId) {
         activeTask.value = { ...activeTask.value, board_column_id: columnId }
       }
+    },
+    onError: () => {
+      // Revert optimistic update on failure
+      if (task) task.board_column_id = prevColumnId
     },
   })
 }
@@ -588,6 +682,16 @@ function toggleSubtask(subtaskId, completed) {
   router.post(route(routeName, subtaskId), {}, { preserveScroll: true })
 }
 
+function uploadAttachment(file) {
+  const form = new FormData()
+  form.append('file', file)
+  router.post(route('tasks.attachments.store', activeTask.value.id), form, { preserveScroll: true })
+}
+
+function removeAttachment(attachmentId) {
+  router.delete(route('attachments.destroy', attachmentId), { preserveScroll: true })
+}
+
 function addColumn(name) {
   router.post(route('columns.store', props.project.id), { name }, { preserveScroll: true })
 }
@@ -602,108 +706,265 @@ function deleteColumn(columnId) {
 </script>
 
 <style scoped>
-.sprint-btn {
-  display: inline-flex;
+/* ── Topbar ── */
+.topbar {
+  display: flex;
   align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-app);
+  min-height: 48px;
+  flex-shrink: 0;
+}
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg-muted);
+  flex: 1;
+  min-width: 0;
+}
+.crumb-dot {
+  width: 10px; height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.crumb-current { color: var(--fg); font-weight: 500; }
+
+.search-wrap {
+  position: relative;
+  width: 280px;
+  flex-shrink: 0;
+}
+.search-icon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--fg-subtle);
+  width: 14px; height: 14px;
+  pointer-events: none;
+}
+.search-input {
+  padding-left: 28px;
   height: 28px;
-  padding: 0 8px;
-  border-radius: 6px;
+  width: 100%;
   border: 1px solid var(--border);
   background: var(--bg-panel);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
   color: var(--fg);
+  outline: none;
+  transition: border-color 80ms, box-shadow 80ms;
+}
+.search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.search-input::placeholder { color: var(--fg-subtle); }
+
+/* Shared secondary button style (topbar new-task + sprint lock/unlock) */
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 28px;
+  border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  gap: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--fg);
+  white-space: nowrap;
   transition: background 80ms;
+  flex-shrink: 0;
 }
-.sprint-btn:hover { background: var(--bg-hover); }
+.btn-secondary:hover { background: var(--bg-hover); }
 
-.header-btn {
+.kbd-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+}
+
+/* ── Sprint header ── */
+.sprint-header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-app);
+  flex-shrink: 0;
+}
+
+.sprint-picker-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 28px;
-  padding: 0 10px;
+  height: 32px;
+  padding: 0 8px;
   border-radius: 6px;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   background: transparent;
   color: var(--fg-muted);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 13px;
+  font-family: inherit;
   cursor: pointer;
   transition: background 80ms;
 }
-.header-btn:hover { background: var(--bg-hover); color: var(--fg); }
+.sprint-picker-btn:hover { background: var(--bg-hover); color: var(--fg); }
 
-.view-btn {
+.sprint-label {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--fg);
+}
+
+.lock-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--status-progress) 14%, var(--bg-panel));
+  color: var(--status-progress);
+  border: 1px solid color-mix(in oklab, var(--status-progress) 30%, var(--border));
+}
+
+.sprint-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.sprint-meta-text {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.days-pill {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+/* Filter trigger button — matches design's btn ghost at height 32px */
+.filter-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 80ms;
+  white-space: nowrap;
+}
+.filter-trigger-btn:hover { background: var(--bg-hover); color: var(--fg); }
+.filter-count-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  min-width: 16px;
+  text-align: center;
+  margin-left: 2px;
+}
+
+/* View toggle */
+.view-toggle {
+  display: flex;
+  align-items: center;
+  background: var(--bg-sunken);
+  border-radius: 6px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  gap: 0;
+}
+.view-toggle-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  padding: 0 10px;
-  height: 28px;
+  padding: 0 8px;
+  height: 24px;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
   color: var(--fg-muted);
   font-size: 12px;
+  font-family: inherit;
   font-weight: 500;
   cursor: pointer;
   transition: background 80ms, color 80ms;
   white-space: nowrap;
 }
-.view-btn:hover { background: var(--bg-hover); color: var(--fg); }
-.view-btn.active { background: var(--bg-active); color: var(--fg); }
-
-.btn-primary {
-  background: var(--accent);
-  color: var(--accent-fg);
-  border: none;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 80ms;
-}
-.btn-primary:hover { background: var(--accent-hover); }
-
-.header-btn--active {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.filter-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--accent); flex-shrink: 0;
+.view-toggle-btn:hover { background: var(--bg-hover); color: var(--fg); }
+.view-toggle-btn.active {
+  background: var(--bg-panel);
+  color: var(--fg);
+  border-color: var(--border);
 }
 
 .filter-panel {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
+  left: 0;
   z-index: 100;
-  width: 240px;
+  width: 260px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-md);
   box-shadow: var(--shadow-lg);
-  padding: 8px 0;
+  padding: 4px;
 }
-.filter-section { padding: 6px 12px; }
-.filter-section-label {
-  font-size: 11px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.05em; color: var(--fg-muted);
-  margin: 0 0 6px;
+.filter-panel-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+  padding: 6px 8px 2px;
 }
-.filter-options { display: flex; flex-direction: column; gap: 2px; }
-.filter-option {
-  display: flex; align-items: center; gap: 8px;
-  padding: 4px 6px; border-radius: var(--r-sm);
-  cursor: pointer; font-size: 13px; color: var(--fg);
+.filter-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--fg);
+  font-family: inherit;
   transition: background 80ms;
+  white-space: nowrap;
 }
-.filter-option:hover { background: var(--bg-hover); }
-.filter-check {
-  width: 14px; height: 14px; border-radius: 3px;
-  accent-color: var(--accent); cursor: pointer; flex-shrink: 0;
-}
+.filter-menu-item:hover { background: var(--bg-hover); }
 .filter-avatar-placeholder {
   width: 20px; height: 20px; border-radius: 50%;
   background: var(--bg-sunken); border: 1px solid var(--border);
@@ -711,15 +972,38 @@ function deleteColumn(columnId) {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
+.filter-tag-chip {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg-sunken);
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+}
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .filter-divider { height: 1px; background: var(--border); margin: 4px 0; }
-.filter-clear {
-  width: calc(100% - 24px); margin: 4px 12px 2px;
-  padding: 6px; border-radius: var(--r-sm);
-  border: none; background: none;
-  font-size: 12px; color: var(--status-blocked);
-  cursor: pointer; text-align: left;
-  transition: background 80ms;
+
+/* Sprint dropdown */
+.sprint-dd-label {
+  padding: 6px 8px 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-subtle);
 }
-.filter-clear:hover { background: var(--bg-hover); }
+.sprint-dd-count {
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  color: var(--fg-muted);
+}
+.sprint-dd-check {
+  width: 14px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+.sprint-dd-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
 </style>

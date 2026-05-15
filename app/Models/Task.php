@@ -75,4 +75,9 @@ class Task extends Model
     {
         return $this->hasMany(Task::class, 'parent_task_id')->orderBy('created_at');
     }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(TaskAttachment::class)->latest();
+    }
 }

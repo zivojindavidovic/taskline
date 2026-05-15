@@ -1,50 +1,43 @@
 <template>
-  <div class="flex flex-col rounded-lg border shrink-0 w-[280px] max-h-full" style="background:var(--bg-sunken);border-color:var(--border)">
+  <div class="column">
     <!-- Header -->
-    <div class="flex items-center gap-2 px-3 py-2.5 border-b" style="border-color:var(--border)">
-      <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: column.color }" />
+    <div class="column-header">
+      <span class="dot" :style="{ background: column.color }" />
 
       <!-- Editable name -->
-      <span class="flex-1 font-semibold text-sm" style="color:var(--fg)">
+      <span class="name">
         <input
           v-if="editing"
           ref="nameInput"
           v-model="editName"
-          class="w-full bg-transparent font-semibold text-sm border-none outline-none focus:ring-0 p-0"
-          style="color:var(--fg)"
           @blur="commitRename"
           @keydown.enter="commitRename"
           @keydown.escape="cancelRename"
         />
         <span
           v-else
-          class="cursor-default"
           :title="locked ? 'Sprint locked' : 'Click to rename'"
           @click="!locked && startRename()"
         >{{ column.name }}</span>
       </span>
 
-      <span class="text-xs tabular-nums" style="color:var(--fg-subtle)">{{ tasks.length }}</span>
+      <span class="count">{{ tasks.length }}</span>
 
       <!-- More menu -->
       <DropdownMenu align="right">
         <template #trigger>
-          <button
-            type="button"
-            class="p-1 rounded hover:bg-[var(--bg-hover)] transition-colors"
-            style="color:var(--fg-muted)"
-          >
+          <button type="button" class="btn ghost icon-only sm">
             <MoreIcon class="w-4 h-4" />
           </button>
         </template>
         <div class="py-1">
           <MenuItem :disabled="locked" @click="!locked && startRename()">
-            <EditIcon class="w-3.5 h-3.5" style="color:var(--fg-muted)" /> Rename column
+            <EditIcon class="w-3.5 h-3.5" /> Rename column
           </MenuItem>
           <MenuItem :disabled="locked" @click="!locked && $emit('addTask', column.id)">
-            <PlusIcon class="w-3.5 h-3.5" style="color:var(--fg-muted)" /> Add task
+            <PlusIcon class="w-3.5 h-3.5" /> Add task
           </MenuItem>
-          <div class="h-px my-1" style="background:var(--border)" />
+          <div class="menu-divider" />
           <MenuItem :disabled="locked || tasks.length > 0" danger @click="tryDelete">
             <TrashIcon class="w-3.5 h-3.5" /> Delete column
           </MenuItem>
@@ -54,11 +47,10 @@
 
     <!-- Body -->
     <div
-      ref="body"
-      class="flex-1 flex flex-col gap-2 p-2 overflow-y-auto"
-      :class="dragOver ? 'column-drag-over' : ''"
+      class="column-body"
+      :class="{ 'drag-over': dragOver }"
       @dragover.prevent="!locked && (dragOver = true)"
-      @dragleave="dragOver = false"
+      @dragleave="onDragLeave"
       @drop.prevent="onDrop"
     >
       <TaskCard
@@ -70,14 +62,24 @@
         @dragStart="$emit('dragStart', $event)"
         @dragEnd="$emit('dragEnd')"
       />
+
+      <!-- Empty column drop zone -->
+      <div v-if="tasks.length === 0" class="column-empty" aria-hidden="true">
+        <div class="column-empty-inner">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3v10M3 8h10"/>
+          </svg>
+          <span>{{ dragOver ? 'Release to drop here' : 'Drop tasks here' }}</span>
+        </div>
+      </div>
     </div>
 
     <!-- Add task button (hidden when locked) -->
-    <div v-if="!locked" class="px-2 py-2 border-t" style="border-color:var(--border)">
+    <div v-if="!locked" class="column-add">
       <button
         type="button"
-        class="flex items-center gap-1.5 w-full px-2 py-1 rounded text-sm transition-colors hover:bg-[var(--bg-hover)]"
-        style="color:var(--fg-muted)"
+        class="btn ghost sm"
+        style="width:100%;justify-content:flex-start;"
         @click="$emit('addTask', column.id)"
       >
         <PlusIcon class="w-3.5 h-3.5" /> Add task
@@ -103,6 +105,12 @@ const emit = defineEmits(['addTask', 'openTask', 'dragStart', 'dragEnd', 'drop',
 
 // Drag-over highlight
 const dragOver = ref(false)
+
+function onDragLeave(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    dragOver.value = false
+  }
+}
 
 function onDrop() {
   dragOver.value = false
@@ -136,3 +144,4 @@ function tryDelete() {
   if (props.tasks.length === 0) emit('delete', props.column.id)
 }
 </script>
+

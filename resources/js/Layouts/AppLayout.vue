@@ -43,21 +43,10 @@
           Create a workspace first
         </button>
 
-        <template v-for="p in projects" :key="p.id">
-          <NavItem :href="route('projects.show', p.id)" :active="isProjectActive(p.id)">
-            <span class="project-dot" :style="{ background: p.color }" />
-            <span class="truncate">{{ p.name }}</span>
-          </NavItem>
-          <NavItem
-            v-if="isProjectActive(p.id)"
-            :href="route('projects.members', p.id)"
-            :active="route().current('projects.members') && route().params?.project == p.id"
-            style="padding-left: 28px"
-          >
-            <UsersIcon style="width:14px;height:14px;flex-shrink:0" />
-            <span class="truncate">Members</span>
-          </NavItem>
-        </template>
+        <NavItem v-for="p in projects" :key="p.id" :href="route('projects.show', p.id)" :active="isProjectActive(p.id)">
+          <span class="project-dot" :style="{ background: p.color }" />
+          <span class="truncate">{{ p.name }}</span>
+        </NavItem>
 
         <!-- Workspace section -->
         <div class="nav-section-label" style="margin-top:8px">
@@ -84,8 +73,8 @@
             <div class="user-role">Owner</div>
           </div>
         </div>
-        <button class="bell-btn" title="Notifications" @click="toast('Notifications — coming soon')">
-          <BellIcon style="width:14px;height:14px" />
+        <button class="bell-btn" title="Settings" @click="showWorkspaceSettings = true">
+          <SettingsIcon style="width:14px;height:14px" />
         </button>
       </div>
 
@@ -115,7 +104,7 @@ import WorkspaceSettingsModal from '@/Components/Modals/WorkspaceSettingsModal.v
 import { useToast } from '@/composables/useToast'
 import {
   ChevronIcon, HomeIcon, InboxIcon, UserIcon,
-  PlusIcon, HistoryIcon, SettingsIcon, BellIcon, UsersIcon,
+  PlusIcon, HistoryIcon, SettingsIcon, UsersIcon,
 } from '@/Components/UI/Icons.vue'
 
 const page = usePage()
@@ -139,10 +128,7 @@ watch(() => page.props.flash, (flash) => {
 
 function isActive(name) { return route().current(name) }
 function isProjectActive(id) {
-  return (
-    (route().current('projects.show') || route().current('projects.members')) &&
-    route().params?.project == id
-  )
+  return route().current('projects.show') && route().params?.project == id
 }
 
 const inboxCount = computed(() => page.props.inbox_count ?? 0)

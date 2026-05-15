@@ -6,9 +6,11 @@ use App\Models\AuditLog;
 use App\Models\BoardColumn;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskAttachment;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -29,15 +31,34 @@ class TaskController extends Controller
             'assignee_id'     => ['nullable', Rule::in($workspaceUserIds)],
             'tags'            => 'nullable|array',
             'tags.*'          => 'string|max:50',
+            'start_date'      => 'nullable|date',
+            'due_date'        => 'nullable|date',
+            'files'           => 'nullable|array',
+            'files.*'         => 'file|max:20480',
         ]);
 
         $taskNum = $project->tasks()->count() + 1;
 
         $task = Task::create([
-            ...$data,
+            ...collect($data)->except('files')->all(),
             'key'        => $project->key.'-'.$taskNum,
             'created_by' => auth()->id(),
         ]);
+
+        if ($request->hasFile('files')) {
+            foreach ($request->file('files') as $file) {
+                $path = $file->store("attachments/task-{$task->id}", 'public');
+                TaskAttachment::create([
+                    'task_id'       => $task->id,
+                    'uploaded_by'   => auth()->id(),
+                    'original_name' => $file->getClientOriginalName(),
+                    'disk'          => 'public',
+                    'path'          => $path,
+                    'mime_type'     => $file->getMimeType(),
+                    'size'          => $file->getSize(),
+                ]);
+            }
+        }
 
         AuditLog::create([
             'user_id'    => auth()->id(),

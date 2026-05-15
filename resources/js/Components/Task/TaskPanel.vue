@@ -1,417 +1,450 @@
 <template>
-  <!-- Backdrop -->
-  <div
-    class="fixed inset-0 z-50 animate-fade-in"
-    style="background:rgba(0,0,0,0.15)"
-    @click="$emit('close')"
-  />
+  <div class="side-panel-backdrop" @click="$emit('close')" />
 
-  <!-- Panel -->
-  <div
-    class="fixed top-0 right-0 h-screen flex flex-col z-[51] animate-slide-in-right"
-    style="width:var(--panel-w);max-width:92vw;background:var(--bg-panel);border-left:1px solid var(--border);box-shadow:var(--shadow-lg)"
-    role="dialog"
-    aria-label="Task details"
-  >
+  <div class="side-panel" role="dialog" aria-label="Task details">
     <!-- Header -->
-    <div class="flex items-center gap-2 px-4 py-3 border-b shrink-0" style="border-color:var(--border)">
-      <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: project?.color }" />
-      <span class="font-mono text-xs flex-1" style="color:var(--fg-muted)">{{ task.key }}</span>
+    <div class="panel-header">
+      <span class="dot" :style="{ background: project?.color }" />
+      <span class="id mono">{{ task.key }}</span>
 
-      <span
-        v-if="locked"
-        class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-        style="background:color-mix(in oklab,var(--status-progress) 14%,var(--bg-panel));color:var(--status-progress);border:1px solid color-mix(in oklab,var(--status-progress) 30%,var(--border))"
-      >
-        <LockIcon class="w-3 h-3" /> Locked
+      <span v-if="locked" class="lock-pill">
+        <LockIcon /> Sprint locked
       </span>
 
-      <span
-        v-if="task.completed"
-        class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
-        style="background:color-mix(in oklab,var(--status-done) 14%,var(--bg-panel));color:var(--status-done);border:1px solid color-mix(in oklab,var(--status-done) 30%,var(--border))"
-      >
-        <CheckIcon class="w-3 h-3" /> Completed
+      <span v-if="task.completed" class="lock-pill done">
+        <CheckIcon /> Completed
       </span>
 
-      <!-- More menu -->
       <DropdownMenu align="right">
         <template #trigger>
-          <button type="button" class="p-1 rounded hover:bg-[var(--bg-hover)]" style="color:var(--fg-muted)">
-            <MoreIcon class="w-4 h-4" />
-          </button>
+          <button type="button" class="btn ghost icon-only sm"><MoreIcon /></button>
         </template>
-        <div class="py-1">
-          <MenuItem @click="copyToClipboard(task.key)"><CopyIcon class="w-3.5 h-3.5 text-[var(--fg-muted)]" /> Copy ID</MenuItem>
-          <div class="h-px my-1" style="background:var(--border)" />
-          <MenuItem danger :disabled="locked" @click="$emit('delete')"><TrashIcon class="w-3.5 h-3.5" /> Delete task</MenuItem>
+        <div>
+          <MenuItem @click="copyId"><CopyIcon /> Copy ID</MenuItem>
+          <MenuItem @click="copyLink"><LinkIcon /> Copy link</MenuItem>
+          <div class="menu-divider" />
+          <MenuItem danger :disabled="locked" @click="!locked && $emit('delete')">
+            <TrashIcon /> Delete task
+          </MenuItem>
         </div>
       </DropdownMenu>
 
-      <button type="button" class="p-1 rounded hover:bg-[var(--bg-hover)]" style="color:var(--fg-muted)" @click="$emit('close')">
-        <CloseIcon class="w-4 h-4" />
+      <button type="button" class="btn ghost icon-only sm" aria-label="Close" @click="$emit('close')">
+        <CloseIcon />
       </button>
     </div>
 
-    <!-- Scrollable body -->
-    <div class="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
-
+    <!-- Body -->
+    <div class="panel-body">
       <!-- Title -->
       <div
         ref="titleEl"
-        class="text-xl font-semibold leading-snug rounded-lg p-2 -m-2 transition-colors"
-        style="color:var(--fg)"
+        class="panel-title"
         :contenteditable="!locked"
-        :data-placeholder="'Task title'"
         spellcheck="false"
+        data-placeholder="Task title"
         @blur="onTitleBlur"
       >{{ task.title }}</div>
 
-      <!-- Completion CTA: in Done but not completed -->
-      <div
-        v-if="isInDone && !task.completed && !locked"
-        class="flex items-center gap-3 p-4 rounded-lg"
-        style="background:color-mix(in oklab,var(--status-done) 10%,var(--bg-panel));border:1.5px solid color-mix(in oklab,var(--status-done) 35%,var(--border))"
-      >
-        <div
-          class="w-9 h-9 rounded-full border-2 border-dashed flex items-center justify-center shrink-0"
-          style="border-color:color-mix(in oklab,var(--status-done) 50%,var(--border));color:color-mix(in oklab,var(--status-done) 80%,var(--fg-muted))"
-        >
-          <CheckIcon class="w-5 h-5" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="font-semibold text-sm" style="color:var(--fg)">Ready to complete?</div>
-          <div class="text-xs mt-0.5" style="color:var(--fg-muted)">
-            Moving to <strong>Done</strong> isn't enough — confirm completion to close this task.
-          </div>
-        </div>
-        <button type="button" class="btn-primary h-8 px-3 text-sm rounded-lg shrink-0" @click="$emit('complete')">
-          <CheckIcon class="w-3.5 h-3.5" /> Mark as completed
-        </button>
+      <!-- Not completed yet banner -->
+      <div v-if="!task.completed && !locked" class="banner banner-done">
+        <CheckIcon class="icon-done" />
+        <span class="text" style="color: var(--status-done); font-weight: 500;">This task is not completed yet</span>
+        <button type="button" class="btn primary sm" @click="$emit('complete')">Mark as completed</button>
       </div>
 
       <!-- Completed banner -->
-      <div
-        v-if="task.completed"
-        class="flex items-center gap-3 px-4 py-3 rounded-lg text-sm"
-        style="background:color-mix(in oklab,var(--status-done) 10%,var(--bg-panel));border:1px solid color-mix(in oklab,var(--status-done) 25%,var(--border))"
-      >
-        <CheckIcon class="w-4 h-4 shrink-0" style="color:var(--status-done)" />
-        <span class="flex-1" style="color:var(--fg)">
+      <div v-if="task.completed" class="banner banner-done">
+        <CheckIcon class="icon-done" />
+        <span class="text">
           Completed by <strong>{{ task.completed_by_user?.name ?? '—' }}</strong>
-          {{ completedAgo }}.
+          <template v-if="completedAgo"> {{ completedAgo }}</template>.
         </span>
-        <button v-if="!locked" type="button" class="btn-secondary h-7 px-3 text-xs rounded-lg" @click="$emit('uncomplete')">
+        <button v-if="!locked" type="button" class="btn secondary sm" @click="$emit('uncomplete')">
           Reopen
         </button>
       </div>
 
-      <!-- Properties grid -->
-      <div class="grid gap-y-2" style="grid-template-columns:100px 1fr;font-size:13px;align-items:center">
-        <!-- Status -->
-        <span style="color:var(--fg-muted)">Status</span>
-        <DropdownMenu>
-          <template #trigger>
-            <button type="button" class="prop-pill">
-              <span class="w-2 h-2 rounded-full" :style="{ background: currentColumn?.color }" />
-              {{ currentColumn?.name ?? '—' }}
-            </button>
-          </template>
-          <div class="py-1">
-            <MenuItem
-              v-for="col in columns"
-              :key="col.id"
-              :disabled="locked"
-              @click="!locked && $emit('update', { board_column_id: col.id })"
-            >
-              <CheckIcon v-if="col.id === task.board_column_id" class="w-3.5 h-3.5" style="color:var(--accent)" />
-              <span v-else class="w-3.5 h-3.5 inline-block" />
-              <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: col.color }" />
-              {{ col.name }}
-            </MenuItem>
-          </div>
-        </DropdownMenu>
-
-        <!-- Assignee -->
-        <span style="color:var(--fg-muted)">Assignee</span>
-        <DropdownMenu :width="220">
-          <template #trigger>
-            <button type="button" class="prop-pill">
-              <Avatar v-if="task.assignee" :name="task.assignee.name" size="sm" />
-              <span v-else class="w-6 h-6 rounded-full bg-[var(--bg-active)] inline-flex items-center justify-center text-xs" style="color:var(--fg-subtle)">?</span>
-              {{ task.assignee?.name ?? 'Unassigned' }}
-            </button>
-          </template>
-          <div class="py-1">
-            <div class="px-2 pt-1 pb-2 text-xs font-medium" style="color:var(--fg-subtle)">Assign to</div>
-            <MenuItem :disabled="locked" @click="!locked && $emit('update', { assignee_id: null })">
-              <CheckIcon v-if="!task.assignee_id" class="w-3.5 h-3.5" style="color:var(--accent)" />
-              <span v-else class="w-3.5 h-3.5 inline-block" />
-              Unassigned
-            </MenuItem>
-            <div class="h-px my-1" style="background:var(--border)" />
-            <MenuItem
-              v-for="u in allUsers"
-              :key="u.id"
-              :disabled="locked"
-              @click="!locked && $emit('update', { assignee_id: u.id })"
-            >
-              <CheckIcon v-if="u.id === task.assignee_id" class="w-3.5 h-3.5" style="color:var(--accent)" />
-              <span v-else class="w-3.5 h-3.5 inline-block" />
-              <Avatar :name="u.name" size="sm" />
-              {{ u.name }}
-            </MenuItem>
-          </div>
-        </DropdownMenu>
-
-        <!-- Priority -->
-        <span style="color:var(--fg-muted)">Priority</span>
-        <DropdownMenu>
-          <template #trigger>
-            <button type="button" class="prop-pill">
-              <PriorityBadge :priority="task.priority" show-label />
-            </button>
-          </template>
-          <div class="py-1">
-            <MenuItem
-              v-for="p in PRIORITIES"
-              :key="p.id"
-              :disabled="locked"
-              @click="!locked && $emit('update', { priority: p.id })"
-            >
-              <CheckIcon v-if="p.id === task.priority" class="w-3.5 h-3.5" style="color:var(--accent)" />
-              <span v-else class="w-3.5 h-3.5 inline-block" />
-              <PriorityBadge :priority="p.id" show-label />
-            </MenuItem>
-          </div>
-        </DropdownMenu>
-
-        <!-- Tags -->
-        <span style="color:var(--fg-muted)">Tags</span>
-        <DropdownMenu :width="200">
-          <template #trigger>
-            <button type="button" class="prop-pill flex-wrap">
-              <template v-if="task.tags?.length">
-                <span
-                  v-for="tag in task.tags"
-                  :key="tag"
-                  class="text-[11px] px-1.5 py-0.5 rounded border"
-                  style="background:var(--bg-sunken);color:var(--fg-muted);border-color:var(--border)"
-                >{{ tag }}</span>
+      <!-- Properties -->
+      <div class="panel-section">
+        <div class="props">
+          <div class="key">Status</div>
+          <div class="val">
+            <DropdownMenu>
+              <template #trigger>
+                <span class="prop-pill">
+                  <span class="dot" :style="{ background: currentColumn?.color }" />
+                  <span>{{ currentColumn?.name ?? '—' }}</span>
+                </span>
               </template>
-              <span v-else style="color:var(--fg-muted)">+ Add tags</span>
-            </button>
-          </template>
-          <div class="py-1">
-            <div class="px-2 pt-1 pb-2 text-xs font-medium" style="color:var(--fg-subtle)">Tags</div>
-            <MenuItem
-              v-for="tag in ALL_TAGS"
-              :key="tag"
-              :disabled="locked"
-              @click="!locked && toggleTag(tag)"
-            >
-              <CheckIcon v-if="task.tags?.includes(tag)" class="w-3.5 h-3.5" style="color:var(--accent)" />
-              <span v-else class="w-3.5 h-3.5 inline-block" />
-              {{ tag }}
-            </MenuItem>
+              <div>
+                <MenuItem
+                  v-for="col in columns"
+                  :key="col.id"
+                  :disabled="locked"
+                  @click="!locked && $emit('update', { board_column_id: col.id })"
+                >
+                  <span class="check-slot"><CheckIcon v-if="col.id === task.board_column_id" class="check" /></span>
+                  <span class="dot" :style="{ background: col.color }" />
+                  <span>{{ col.name }}</span>
+                </MenuItem>
+              </div>
+            </DropdownMenu>
           </div>
-        </DropdownMenu>
 
-        <!-- Dates -->
-        <span style="color:var(--fg-muted)">Due date</span>
-        <label class="relative inline-flex items-center">
-          <span
-            class="prop-pill text-sm cursor-pointer"
-            :class="{ 'opacity-50': locked }"
-            @click="!locked && $refs.dueDateInput.showPicker?.()"
-          >
-            <CalendarIcon class="w-3.5 h-3.5" style="color:var(--fg-muted)" />
-            {{ task.due_date ? formatDate(task.due_date) : 'Set date' }}
-          </span>
-          <input
-            ref="dueDateInput"
-            type="date"
-            :value="task.due_date ? task.due_date.toString().slice(0, 10) : ''"
-            :disabled="locked"
-            class="absolute inset-0 opacity-0 w-full cursor-pointer"
-            style="pointer-events:none"
-            @change="e => $emit('update', { due_date: e.target.value || null })"
-          />
-        </label>
+          <div class="key">Assignee</div>
+          <div class="val">
+            <DropdownMenu :width="220">
+              <template #trigger>
+                <span class="prop-pill">
+                  <template v-if="task.assignee">
+                    <Avatar :name="task.assignee.name" size="sm" />
+                    <span>{{ task.assignee.name }}</span>
+                  </template>
+                  <template v-else>
+                    <span class="avatar-empty">?</span>
+                    <span class="muted">Unassigned</span>
+                  </template>
+                </span>
+              </template>
+              <div>
+                <div class="menu-label">Assign to</div>
+                <MenuItem :disabled="locked" @click="!locked && $emit('update', { assignee_id: null })">
+                  <span class="check-slot"><CheckIcon v-if="!task.assignee_id" class="check" /></span>
+                  Unassigned
+                </MenuItem>
+                <div class="menu-divider" />
+                <MenuItem
+                  v-for="u in allUsers"
+                  :key="u.id"
+                  :disabled="locked"
+                  @click="!locked && $emit('update', { assignee_id: u.id })"
+                >
+                  <span class="check-slot"><CheckIcon v-if="u.id === task.assignee_id" class="check" /></span>
+                  <Avatar :name="u.name" size="sm" />
+                  <span>{{ u.name }}</span>
+                </MenuItem>
+              </div>
+            </DropdownMenu>
+          </div>
 
-        <!-- Sprint -->
-        <span style="color:var(--fg-muted)">Sprint</span>
-        <span class="inline-flex items-center gap-1.5 text-sm" style="color:var(--fg)">
-          <LightningIcon class="w-3.5 h-3.5" style="color:var(--fg-muted)" />
-          {{ task.sprint?.name ?? '—' }}
-        </span>
+          <div class="key">Priority</div>
+          <div class="val">
+            <DropdownMenu>
+              <template #trigger>
+                <span class="prop-pill"><PriorityBadge :priority="task.priority" show-label /></span>
+              </template>
+              <div>
+                <MenuItem
+                  v-for="p in PRIORITIES"
+                  :key="p.id"
+                  :disabled="locked"
+                  @click="!locked && $emit('update', { priority: p.id })"
+                >
+                  <span class="check-slot"><CheckIcon v-if="p.id === task.priority" class="check" /></span>
+                  <PriorityBadge :priority="p.id" show-label />
+                </MenuItem>
+              </div>
+            </DropdownMenu>
+          </div>
+
+          <div class="key">Project</div>
+          <div class="val">
+            <DropdownMenu :width="220">
+              <template #trigger>
+                <span class="prop-pill">
+                  <span class="dot" :style="{ background: taskProject?.color }" />
+                  <span>{{ taskProject?.name ?? '—' }}</span>
+                </span>
+              </template>
+              <div>
+                <div class="menu-label">Move to project</div>
+                <MenuItem
+                  v-for="p in allProjects"
+                  :key="p.id"
+                  :disabled="locked"
+                  @click="!locked && $emit('update', { project_id: p.id })"
+                >
+                  <span class="check-slot"><CheckIcon v-if="p.id === (task.project_id ?? project?.id)" class="check" /></span>
+                  <span class="dot" :style="{ background: p.color }" />
+                  <span>{{ p.name }}</span>
+                </MenuItem>
+              </div>
+            </DropdownMenu>
+          </div>
+
+          <div class="key">Sprint</div>
+          <div class="val sprint-val">
+            <LightningIcon class="dim" />
+            <span>{{ task.sprint?.name ?? '—' }}</span>
+          </div>
+
+          <div class="key">Dates</div>
+          <div class="val">
+            <DropdownMenu :width="280">
+              <template #trigger>
+                <span class="prop-pill">
+                  <CalendarIcon class="dim" />
+                  <span v-if="task.start_date || task.due_date">
+                    {{ dateRangeLabel }}
+                  </span>
+                  <span v-else class="muted">Set dates…</span>
+                </span>
+              </template>
+              <div class="dropdown-pad" @click.stop>
+                <div class="menu-label">Date range</div>
+                <div class="date-fields">
+                  <label class="field-block">
+                    <span class="field-label">Start</span>
+                    <input
+                      type="date"
+                      :value="dateValue(task.start_date)"
+                      :disabled="locked"
+                      class="input"
+                      @change="e => !locked && $emit('update', { start_date: e.target.value || null })"
+                    />
+                  </label>
+                  <label class="field-block">
+                    <span class="field-label">Due</span>
+                    <input
+                      type="date"
+                      :value="dateValue(task.due_date)"
+                      :disabled="locked"
+                      class="input"
+                      @change="e => !locked && $emit('update', { due_date: e.target.value || null })"
+                    />
+                  </label>
+                  <button
+                    v-if="task.start_date || task.due_date"
+                    type="button"
+                    class="btn ghost sm clear-btn"
+                    :disabled="locked"
+                    @click="!locked && $emit('update', { start_date: null, due_date: null })"
+                  >
+                    <CloseIcon /> Clear dates
+                  </button>
+                </div>
+              </div>
+            </DropdownMenu>
+          </div>
+
+          <div class="key">Tags</div>
+          <div class="val">
+            <DropdownMenu :width="220">
+              <template #trigger>
+                <span class="prop-pill">
+                  <span v-if="task.tags?.length" class="tags">
+                    <span v-for="tag in task.tags" :key="tag" class="tag">{{ tag }}</span>
+                  </span>
+                  <span v-else class="muted">+ Add tags</span>
+                </span>
+              </template>
+              <div>
+                <div class="menu-label">Tags</div>
+                <div class="dropdown-pad" @click.stop>
+                  <input
+                    v-model="tagSearch"
+                    class="input"
+                    autofocus
+                    placeholder="Find or create a tag…"
+                    @keydown.enter.prevent="addNewTag"
+                    @keydown.stop
+                  />
+                </div>
+                <MenuItem
+                  v-if="canAddDraftTag"
+                  :disabled="locked"
+                  @click.stop="!locked && addNewTag()"
+                >
+                  <span class="check-slot"><PlusIcon class="check" /></span>
+                  <span>Create <strong>{{ normalizeTag(tagSearch) }}</strong></span>
+                </MenuItem>
+                <div v-if="filteredTagOptions.length === 0 && !canAddDraftTag" class="muted small-pad">No matches</div>
+                <MenuItem
+                  v-for="tag in filteredTagOptions"
+                  :key="tag"
+                  :disabled="locked"
+                  data-keep-open
+                  @click.stop="!locked && toggleTag(tag)"
+                >
+                  <span class="check-slot"><CheckIcon v-if="task.tags?.includes(tag)" class="check" /></span>
+                  <span>{{ tag }}</span>
+                </MenuItem>
+              </div>
+            </DropdownMenu>
+          </div>
+        </div>
       </div>
 
       <!-- Subtasks -->
-      <div>
-        <div class="flex items-center justify-between mb-2">
-          <div class="text-xs font-medium uppercase tracking-wider" style="color:var(--fg-muted)">
-            Subtasks
-            <span v-if="task.subtasks?.length" class="ml-1.5 normal-case font-normal" style="color:var(--fg-subtle)">{{ completedSubtasksCount }}/{{ task.subtasks.length }}</span>
+      <div class="panel-section">
+        <div class="section-head">
+          <div class="head-left">
+            <span class="panel-section-title">Subtasks</span>
+            <span v-if="task.subtasks?.length" class="count-mono">
+              {{ completedSubtasksCount }}/{{ task.subtasks.length }}
+            </span>
           </div>
           <button
             v-if="!locked"
             type="button"
-            class="inline-flex items-center gap-1 text-xs px-1.5 py-1 rounded transition-colors hover:bg-[var(--bg-hover)]"
-            style="color:var(--fg-muted)"
+            class="btn ghost sm"
             @click="openSubtaskInput"
-          >
-            <PlusIcon class="w-3.5 h-3.5" /> Add
-          </button>
+          >+ Add</button>
         </div>
 
-        <!-- Progress bar -->
-        <div v-if="task.subtasks?.length" class="h-1 rounded-full mb-3 overflow-hidden" style="background:var(--bg-sunken)">
-          <div class="h-full rounded-full transition-all duration-300" style="background:var(--status-done)" :style="{ width: subtaskProgress + '%' }" />
+        <div v-if="task.subtasks?.length" class="subtask-progress">
+          <div class="bar" :style="{ width: subtaskProgress + '%' }" />
         </div>
 
-        <!-- Subtask list -->
-        <div v-if="task.subtasks?.length" class="flex flex-col gap-0.5 mb-2">
+        <p v-if="!task.subtasks?.length && !showSubtaskInput" class="muted small-pad">No subtasks yet.</p>
+
+        <div v-if="task.subtasks?.length" class="subtask-list">
           <div
             v-for="sub in task.subtasks"
             :key="sub.id"
-            class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg group"
-            style="transition:background 80ms"
-            @mouseenter="e => e.currentTarget.style.background='var(--bg-hover)'"
-            @mouseleave="e => e.currentTarget.style.background='transparent'"
+            class="subtask-row"
+            @mouseenter="hoveredSubtaskId = sub.id"
+            @mouseleave="hoveredSubtaskId = null"
           >
             <button
               type="button"
-              class="w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-colors"
-              :style="sub.completed ? 'background:var(--status-done);border-color:var(--status-done)' : 'background:transparent;border-color:var(--border-strong)'"
+              class="subtask-check"
+              :class="{ done: sub.completed }"
               :disabled="locked"
-              @click="$emit('subtaskToggle', sub.id, !sub.completed)"
+              @click.stop="$emit('subtaskToggle', sub.id, !sub.completed)"
             >
-              <CheckIcon v-if="sub.completed" class="w-2.5 h-2.5" style="color:#fff" />
+              <CheckIcon v-if="sub.completed" />
             </button>
             <span
-              class="flex-1 text-sm truncate"
-              :class="{ 'line-through opacity-40': sub.completed }"
-              style="color:var(--fg)"
+              class="subtask-title"
+              :class="{ done: sub.completed }"
+              @click="openSubtaskId = sub.id"
             >{{ sub.title }}</span>
-            <span class="text-xs font-mono shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" style="color:var(--fg-subtle)">{{ sub.key }}</span>
-            <Avatar v-if="sub.assignee" :name="sub.assignee.name" size="sm" class="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div class="subtask-chips">
+              <span v-if="sub.due_date" class="subtask-due">{{ formatDateShort(sub.due_date) }}</span>
+              <span
+                v-if="sub.priority && sub.priority !== 'med'"
+                class="subtask-prio"
+                :style="{ background: priorityColor(sub.priority) }"
+                :title="sub.priority"
+              />
+              <Avatar v-if="sub.assignee" :name="sub.assignee.name" size="sm" />
+            </div>
+            <button
+              v-if="!locked && hoveredSubtaskId === sub.id"
+              type="button"
+              class="subtask-remove"
+              :aria-label="`Remove ${sub.title}`"
+              @click.stop="$emit('subtaskRemove', sub.id)"
+            ><CloseIcon /></button>
           </div>
         </div>
 
-        <!-- Empty state -->
-        <p v-else-if="!showSubtaskInput" class="text-sm" style="color:var(--fg-subtle)">No subtasks.</p>
-
-        <!-- Add subtask inline form -->
-        <div v-if="showSubtaskInput" class="flex items-center gap-2 mt-1 px-2 py-1.5 rounded-lg" style="border:1px solid var(--border);background:var(--bg-sunken)">
-          <div class="w-4 h-4 rounded border shrink-0" style="border-color:var(--border-strong)" />
+        <div v-if="showSubtaskInput" class="subtask-add-row">
+          <div class="subtask-check empty" />
           <input
             ref="subtaskInputEl"
             v-model="newSubtaskTitle"
-            type="text"
-            class="flex-1 text-sm bg-transparent border-none outline-none"
-            style="color:var(--fg)"
-            placeholder="Subtask title…"
+            class="input"
+            placeholder="Subtask title… (Enter to save)"
             @keydown.enter.prevent="submitSubtask"
             @keydown.escape="cancelSubtask"
+            @blur="onSubtaskBlur"
           />
-          <button type="button" class="btn-primary h-6 px-2.5 text-xs rounded" :disabled="!newSubtaskTitle.trim()" @click="submitSubtask">Add</button>
-          <button type="button" class="btn-ghost h-6 px-2.5 text-xs rounded" @click="cancelSubtask">✕</button>
         </div>
       </div>
 
       <!-- Description -->
-      <div>
-        <div class="text-xs font-medium uppercase tracking-wider mb-2" style="color:var(--fg-muted)">Description</div>
+      <div class="panel-section">
+        <div class="panel-section-title">Description</div>
         <div
           ref="descEl"
-          class="text-sm leading-relaxed rounded-lg p-2 -mx-2 transition-colors min-h-[40px]"
-          :class="!task.description ? 'text-[var(--fg-subtle)]' : ''"
-          style="color:var(--fg)"
+          class="description"
+          :class="{ empty: !task.description }"
           :contenteditable="!locked"
-          :data-placeholder="'Add description…'"
           spellcheck="false"
           @blur="onDescBlur"
         >{{ task.description || '' }}</div>
       </div>
 
+      <!-- Attachments -->
+      <AttachmentsSection
+        :attachments="task.attachments ?? []"
+        :locked="locked"
+        @upload="file => emit('attachmentUpload', file)"
+        @remove="id => emit('attachmentRemove', id)"
+      />
+
       <!-- Tabs: Comments / Activity -->
-      <div>
-        <div class="flex gap-4 border-b mb-3" style="border-color:var(--border)">
+      <div class="panel-section">
+        <div class="minitabs">
           <button
-            v-for="tab in ['comments','activity']"
-            :key="tab"
             type="button"
-            class="pb-2 text-sm font-medium capitalize border-b-2 -mb-px transition-colors"
-            :style="activeTab === tab
-              ? 'color:var(--fg);border-color:var(--accent)'
-              : 'color:var(--fg-muted);border-color:transparent'"
-            @click="activeTab = tab"
+            class="minitab"
+            :class="{ active: activeTab === 'comments' }"
+            @click="activeTab = 'comments'"
           >
-            {{ tab }}
-            <span
-              class="ml-1 text-[11px] px-1.5 py-0.5 rounded-full"
-              style="background:var(--bg-active);color:var(--fg-muted)"
-            >{{ tab === 'comments' ? task.comments?.length : task.audit_logs?.length }}</span>
+            Comments <span class="badge">{{ task.comments?.length ?? 0 }}</span>
+          </button>
+          <button
+            type="button"
+            class="minitab"
+            :class="{ active: activeTab === 'activity' }"
+            @click="activeTab = 'activity'"
+          >
+            Activity <span class="badge">{{ task.audit_logs?.length ?? 0 }}</span>
           </button>
         </div>
 
         <!-- Comments tab -->
-        <div v-if="activeTab === 'comments'" class="flex flex-col gap-1">
-          <div v-if="!task.comments?.length" class="text-sm py-2" style="color:var(--fg-muted)">
+        <div v-if="activeTab === 'comments'" class="vstack">
+          <div v-if="!task.comments?.length" class="muted small-pad">
             No comments yet. Start the discussion.
           </div>
 
           <div v-for="c in task.comments" :key="c.id">
-            <div class="flex gap-3 py-2">
+            <div class="comment">
               <Avatar :name="c.user?.name" size="sm" />
-              <div class="flex-1 min-w-0">
-                <div class="flex items-baseline gap-2 mb-1">
-                  <span class="text-sm font-semibold" style="color:var(--fg)">{{ c.user?.name }}</span>
-                  <span class="text-xs" style="color:var(--fg-subtle)">{{ formatAgo(c.created_at) }}</span>
+              <div class="body">
+                <div class="author-row">
+                  <span class="author">{{ c.user?.name }}</span>
+                  <span class="time">{{ formatAgo(c.created_at) }}</span>
                 </div>
-                <div class="text-sm leading-relaxed whitespace-pre-wrap" style="color:var(--fg)">{{ c.body }}</div>
-                <button
-                  v-if="!locked"
-                  type="button"
-                  class="text-xs font-medium mt-1"
-                  style="color:var(--fg-muted)"
-                  @click="replyingTo = replyingTo === c.id ? null : c.id"
-                >Reply</button>
+                <div class="text">{{ c.body }}</div>
+                <div v-if="!locked" class="actions">
+                  <button type="button" @click="replyingTo = replyingTo === c.id ? null : c.id">Reply</button>
+                </div>
               </div>
             </div>
 
-            <!-- Replies -->
-            <div v-if="c.replies?.length || replyingTo === c.id" class="ml-9 pl-3 border-l" style="border-color:var(--border)">
-              <div v-for="r in c.replies" :key="r.id" class="flex gap-3 py-1.5">
+            <div v-if="c.replies?.length || replyingTo === c.id" class="thread-replies">
+              <div v-for="r in c.replies" :key="r.id" class="comment">
                 <Avatar :name="r.user?.name" size="sm" />
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-baseline gap-2 mb-0.5">
-                    <span class="text-sm font-semibold" style="color:var(--fg)">{{ r.user?.name }}</span>
-                    <span class="text-xs" style="color:var(--fg-subtle)">{{ formatAgo(r.created_at) }}</span>
+                <div class="body">
+                  <div class="author-row">
+                    <span class="author">{{ r.user?.name }}</span>
+                    <span class="time">{{ formatAgo(r.created_at) }}</span>
                   </div>
-                  <div class="text-sm leading-relaxed whitespace-pre-wrap" style="color:var(--fg)">{{ r.body }}</div>
+                  <div class="text">{{ r.body }}</div>
                 </div>
               </div>
 
-              <!-- Reply composer -->
-              <div v-if="replyingTo === c.id" class="flex gap-2 py-2">
+              <div v-if="replyingTo === c.id" class="composer">
                 <Avatar :name="currentUser?.name" size="sm" />
-                <div class="flex-1">
+                <div class="body">
                   <textarea
                     v-model="replyText"
-                    rows="2"
-                    class="w-full text-sm px-3 py-2 rounded-lg border resize-none"
-                    style="border-color:var(--border);background:var(--bg-panel);color:var(--fg)"
-                    :placeholder="`Reply…`"
+                    class="input textarea"
+                    :placeholder="`Reply to ${c.user?.name ?? ''}…`"
                     autofocus
                   />
-                  <div class="flex justify-end gap-2 mt-1.5">
-                    <button type="button" class="btn-ghost h-7 px-3 text-xs rounded" @click="replyingTo = null; replyText = ''">Cancel</button>
+                  <div class="hstack-end">
+                    <button type="button" class="btn ghost sm" @click="replyingTo = null; replyText = ''">Cancel</button>
                     <button
                       type="button"
+                      class="btn primary sm"
                       :disabled="!replyText.trim()"
-                      class="btn-primary h-7 px-3 text-xs rounded"
                       @click="submitReply(c.id)"
                     >Reply</button>
                   </div>
@@ -420,28 +453,26 @@
             </div>
           </div>
 
-          <!-- Comment composer -->
-          <div v-if="!locked" class="flex gap-3 mt-3">
+          <!-- Composer -->
+          <div v-if="!locked" class="composer">
             <Avatar :name="currentUser?.name" size="sm" />
-            <div class="flex-1">
+            <div class="body">
               <textarea
                 v-model="newComment"
-                rows="2"
-                class="w-full text-sm px-3 py-2 rounded-lg border resize-none"
-                style="border-color:var(--border);background:var(--bg-panel);color:var(--fg)"
+                class="input textarea"
                 placeholder="Add a comment… (@ to mention)"
               />
-              <div class="flex items-center justify-between mt-1.5">
-                <span class="text-xs" style="color:var(--fg-subtle)">
-                  Markdown supported · <kbd class="px-1 py-0.5 rounded text-[10px] border" style="border-color:var(--border);background:var(--bg-hover)">⌘↵</kbd> to send
+              <div class="send-row">
+                <span class="subtle small">
+                  Markdown supported · <span class="kbd">⌘↵</span> to send
                 </span>
                 <button
                   type="button"
+                  class="btn primary"
                   :disabled="!newComment.trim()"
-                  class="btn-primary h-7 px-3 text-xs rounded inline-flex items-center gap-1"
                   @click="submitComment"
                 >
-                  <SendIcon class="w-3 h-3" /> Comment
+                  <SendIcon /> Comment
                 </button>
               </div>
             </div>
@@ -449,40 +480,108 @@
         </div>
 
         <!-- Activity tab -->
-        <div v-if="activeTab === 'activity'" class="flex flex-col">
-          <div v-if="!task.audit_logs?.length" class="text-sm py-2" style="color:var(--fg-muted)">No activity yet.</div>
+        <div v-if="activeTab === 'activity'" class="vstack-tight">
+          <div v-if="!task.audit_logs?.length" class="muted small-pad">No activity yet.</div>
           <div
             v-for="(a, i) in [...(task.audit_logs ?? [])].reverse()"
             :key="i"
-            class="flex gap-3 py-2 text-sm"
+            class="audit-row"
           >
-            <div class="flex flex-col items-center w-6 shrink-0">
-              <div class="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style="background:var(--border-strong)" />
-              <div v-if="i < (task.audit_logs?.length ?? 0) - 1" class="w-px flex-1 mt-1" style="background:var(--border)" />
+            <div class="dot-col">
+              <div class="line" />
+              <div class="dot" />
             </div>
-            <div class="flex-1 min-w-0 flex items-start justify-between gap-2">
-              <span style="color:var(--fg-muted)">
-                <strong style="color:var(--fg)">{{ a.user?.name ?? 'Someone' }}</strong>
-                {{ auditLabel(a.action, a.meta) }}
-              </span>
-              <span class="text-xs shrink-0" style="color:var(--fg-subtle)">{{ formatAgo(a.created_at) }}</span>
+            <div class="text">
+              <strong>{{ a.user?.name ?? 'Someone' }}</strong>
+              {{ auditLabel(a.action, a.meta) }}
             </div>
+            <div class="time">{{ formatAgo(a.created_at) }}</div>
           </div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- Subtask detail panel — slides over the task panel, design 1:1 -->
+  <template v-if="openSubtask">
+    <div class="side-panel-backdrop subtask-layer" @click="openSubtaskId = null" />
+    <div class="side-panel subtask-layer" role="dialog" aria-label="Subtask details">
+      <div class="panel-header">
+        <button type="button" class="btn ghost sm crumb" @click="openSubtaskId = null">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          <span class="crumb-text">{{ task.title }}</span>
+        </button>
+        <div class="spacer" />
+        <button type="button" class="btn ghost icon-only sm" aria-label="Close" @click="openSubtaskId = null"><CloseIcon /></button>
+      </div>
+
+      <div class="panel-body">
+        <div class="subtask-kicker">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span>Subtask</span>
+        </div>
+
+        <div class="panel-title static">{{ openSubtask.title }}</div>
+
+        <div class="panel-section">
+          <div class="props">
+            <div class="key">Assignee</div>
+            <div class="val">
+              <span class="prop-pill">
+                <template v-if="openSubtask.assignee">
+                  <Avatar :name="openSubtask.assignee.name" size="sm" />
+                  <span>{{ openSubtask.assignee.name }}</span>
+                </template>
+                <template v-else>
+                  <span class="avatar-empty">?</span>
+                  <span class="muted">Unassigned</span>
+                </template>
+              </span>
+            </div>
+
+            <div class="key">Priority</div>
+            <div class="val">
+              <span class="prop-pill"><PriorityBadge :priority="openSubtask.priority || 'med'" show-label /></span>
+            </div>
+
+            <div class="key">Due date</div>
+            <div class="val">
+              <span class="prop-pill">
+                <CalendarIcon class="dim" />
+                <span v-if="openSubtask.due_date">{{ formatDate(openSubtask.due_date) }}</span>
+                <span v-else class="muted">Not set</span>
+              </span>
+            </div>
+
+            <div class="key">Tags</div>
+            <div class="val">
+              <span v-if="openSubtask.tags?.length" class="tags">
+                <span v-for="t in openSubtask.tags" :key="t" class="tag">{{ t }}</span>
+              </span>
+              <span v-else class="muted">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="panel-section-title">Description</div>
+          <div class="description" :class="{ empty: !openSubtask.description }">{{ openSubtask.description || '' }}</div>
+        </div>
+      </div>
+    </div>
+  </template>
 </template>
 
 <script setup>
 import { ref, computed, nextTick } from 'vue'
-import { router, usePage } from '@inertiajs/vue3'
+import { usePage } from '@inertiajs/vue3'
 import Avatar from '@/Components/UI/Avatar.vue'
 import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
 import DropdownMenu from '@/Components/UI/DropdownMenu.vue'
 import MenuItem from '@/Components/UI/MenuItem.vue'
+import AttachmentsSection from '@/Components/Task/AttachmentsSection.vue'
 import {
-  LockIcon, CheckIcon, MoreIcon, CopyIcon, TrashIcon,
+  LockIcon, CheckIcon, MoreIcon, CopyIcon, LinkIcon, TrashIcon,
   CloseIcon, LightningIcon, SendIcon, CalendarIcon, PlusIcon,
 } from '@/Components/UI/Icons.vue'
 
@@ -493,21 +592,42 @@ const props = defineProps({
   project:  { type: Object, default: null },
   locked:   { type: Boolean, default: false },
 })
-const emit = defineEmits(['close', 'update', 'comment', 'reply', 'complete', 'uncomplete', 'delete', 'subtask', 'subtaskToggle'])
+const emit = defineEmits([
+  'close', 'update', 'comment', 'reply',
+  'complete', 'uncomplete', 'delete',
+  'subtask', 'subtaskToggle', 'subtaskRemove',
+  'attachmentUpload', 'attachmentRemove',
+])
+
+const hoveredSubtaskId = ref(null)
+const openSubtaskId    = ref(null)
+const openSubtask      = computed(() => props.task.subtasks?.find(s => s.id === openSubtaskId.value) || null)
+
+const PRIORITY_COLORS = {
+  urgent: '#dc2626',
+  high:   '#d97706',
+  med:    '#94948c',
+  low:    '#6b7280',
+}
+function priorityColor(id) { return PRIORITY_COLORS[id] || PRIORITY_COLORS.med }
+function formatDateShort(d) {
+  if (!d) return ''
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 const page = usePage()
 const currentUser = computed(() => page.props.auth.user)
 
-const activeTab       = ref('comments')
-const newComment      = ref('')
-const replyText       = ref('')
-const replyingTo      = ref(null)
-const titleEl         = ref(null)
-const descEl          = ref(null)
-const dueDateInput    = ref(null)
+const activeTab        = ref('comments')
+const newComment       = ref('')
+const replyText        = ref('')
+const replyingTo       = ref(null)
+const titleEl          = ref(null)
+const descEl           = ref(null)
 const showSubtaskInput = ref(false)
 const newSubtaskTitle  = ref('')
 const subtaskInputEl   = ref(null)
+const tagSearch        = ref('')
 
 const PRIORITIES = [
   { id: 'urgent', label: 'Urgent' },
@@ -515,8 +635,35 @@ const PRIORITIES = [
   { id: 'med',    label: 'Medium' },
   { id: 'low',    label: 'Low' },
 ]
-
 const ALL_TAGS = ['frontend', 'backend', 'design', 'bug', 'feature', 'infra', 'research', 'a11y', 'perf']
+
+const allTagOptions = computed(() => {
+  const extra = props.task.tags ?? []
+  return [...new Set([...ALL_TAGS, ...extra])]
+})
+const filteredTagOptions = computed(() => {
+  const q = tagSearch.value.trim().toLowerCase()
+  if (!q) return allTagOptions.value
+  return allTagOptions.value.filter(t => t.includes(q))
+})
+const canAddDraftTag = computed(() => {
+  const n = normalizeTag(tagSearch.value)
+  return n && !allTagOptions.value.includes(n)
+})
+
+function normalizeTag(s) { return s.trim().toLowerCase().replace(/\s+/g, '-') }
+function addNewTag() {
+  const t = normalizeTag(tagSearch.value)
+  if (!t) return
+  if (!props.task.tags?.includes(t)) emit('update', { tags: [...(props.task.tags ?? []), t] })
+  tagSearch.value = ''
+}
+function toggleTag(tag) {
+  const tags = [...(props.task.tags ?? [])]
+  const idx  = tags.indexOf(tag)
+  if (idx === -1) tags.push(tag); else tags.splice(idx, 1)
+  emit('update', { tags })
+}
 
 const completedSubtasksCount = computed(() => props.task.subtasks?.filter(s => s.completed).length ?? 0)
 const subtaskProgress = computed(() => {
@@ -525,71 +672,26 @@ const subtaskProgress = computed(() => {
 })
 
 const currentColumn = computed(() => props.columns.find(c => c.id === props.task.board_column_id))
-const doneColumn    = computed(() => props.columns.find(c => c.name.toLowerCase() === 'done'))
-const isInDone      = computed(() => props.task.board_column_id === doneColumn.value?.id)
 
 const completedAgo = computed(() => {
   if (!props.task.completed_at) return ''
   return new Date(props.task.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 })
 
-function onTitleBlur(e) {
-  const val = e.target.innerText.trim()
-  if (val && val !== props.task.title) emit('update', { title: val })
-}
+const dateRangeLabel = computed(() => {
+  const s = props.task.start_date, d = props.task.due_date
+  if (s && d && s !== d) return `${formatDate(s)} → ${formatDate(d)}`
+  return formatDate(d || s)
+})
 
-function onDescBlur(e) {
-  const val = e.target.innerText.trim()
-  if (val !== (props.task.description ?? '')) emit('update', { description: val })
+function dateValue(d) {
+  if (!d) return ''
+  return d.toString().slice(0, 10)
 }
-
-function toggleTag(tag) {
-  const tags = [...(props.task.tags ?? [])]
-  const idx  = tags.indexOf(tag)
-  if (idx === -1) tags.push(tag)
-  else tags.splice(idx, 1)
-  emit('update', { tags })
-}
-
-function submitComment() {
-  if (!newComment.value.trim()) return
-  emit('comment', newComment.value.trim())
-  newComment.value = ''
-}
-
-function submitReply(parentId) {
-  if (!replyText.value.trim()) return
-  emit('reply', parentId, replyText.value.trim())
-  replyText.value = ''
-  replyingTo.value = null
-}
-
-function openSubtaskInput() {
-  showSubtaskInput.value = true
-  nextTick(() => subtaskInputEl.value?.focus())
-}
-
-function submitSubtask() {
-  const title = newSubtaskTitle.value.trim()
-  if (!title) return
-  emit('subtask', { title })
-  newSubtaskTitle.value = ''
-  showSubtaskInput.value = false
-}
-
-function cancelSubtask() {
-  newSubtaskTitle.value = ''
-  showSubtaskInput.value = false
-}
-
-function copyToClipboard(text) {
-  navigator.clipboard?.writeText(text)
-}
-
 function formatDate(d) {
+  if (!d) return ''
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
-
 function formatAgo(date) {
   if (!date) return ''
   const d = new Date(date)
@@ -599,15 +701,14 @@ function formatAgo(date) {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
-
 function auditLabel(action, meta) {
   switch (action) {
     case 'task.created':          return 'created this task'
     case 'task.completed':        return 'marked as completed'
     case 'task.reopened':         return 'reopened the task'
     case 'task.moved':            return `moved to ${meta?.column ?? '—'}`
-    case 'task.renamed':          return `renamed the task`
-    case 'task.assigned':         return `updated assignee`
+    case 'task.renamed':          return 'renamed the task'
+    case 'task.assigned':         return 'updated assignee'
     case 'task.priority_changed': return `changed priority to ${meta?.priority ?? '—'}`
     case 'task.tags_updated':     return 'updated tags'
     case 'task.updated':          return 'updated the task'
@@ -615,61 +716,447 @@ function auditLabel(action, meta) {
     default:                      return action
   }
 }
+
+function onTitleBlur(e) {
+  const val = e.target.innerText.trim()
+  if (val && val !== props.task.title) emit('update', { title: val })
+}
+function onDescBlur(e) {
+  const val = e.target.innerText
+  if (val !== (props.task.description ?? '')) emit('update', { description: val })
+}
+function submitComment() {
+  if (!newComment.value.trim()) return
+  emit('comment', newComment.value.trim()); newComment.value = ''
+}
+function submitReply(parentId) {
+  if (!replyText.value.trim()) return
+  emit('reply', parentId, replyText.value.trim())
+  replyText.value = ''; replyingTo.value = null
+}
+function openSubtaskInput() {
+  showSubtaskInput.value = true
+  nextTick(() => subtaskInputEl.value?.focus())
+}
+function submitSubtask() {
+  const title = newSubtaskTitle.value.trim()
+  if (!title) return
+  emit('subtask', { title })
+  newSubtaskTitle.value = ''
+  showSubtaskInput.value = false
+}
+function cancelSubtask() {
+  newSubtaskTitle.value = ''
+  showSubtaskInput.value = false
+}
+function onSubtaskBlur() {
+  if (newSubtaskTitle.value.trim()) submitSubtask()
+  else cancelSubtask()
+}
+function copyId()   { navigator.clipboard?.writeText(props.task.key) }
+function copyLink() { navigator.clipboard?.writeText(window.location.href) }
 </script>
 
 <style scoped>
-.prop-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 8px;
+/* ===== Side panel shell ===== */
+.side-panel-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.15);
+  z-index: 50;
+  animation: tp-fadeIn 120ms ease-out;
+}
+:global([data-theme="dark"]) .side-panel-backdrop { background: rgba(0,0,0,0.4); }
+.side-panel {
+  position: fixed; top: 0; right: 0;
+  height: 100vh;
+  width: var(--panel-w, 480px); max-width: 92vw;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  z-index: 51;
+  display: flex; flex-direction: column;
+  animation: tp-slideIn 180ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes tp-fadeIn  { from { opacity: 0 } to { opacity: 1 } }
+@keyframes tp-slideIn { from { transform: translateX(40px); opacity: 0 } to { transform: none; opacity: 1 } }
+
+/* ===== Header ===== */
+.panel-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.panel-header > .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.panel-header .id    { font-family: var(--font-mono); font-size: 12px; color: var(--fg-muted); flex: 1; }
+
+.lock-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 500;
+  padding: 2px 8px; border-radius: 999px;
+  background: color-mix(in oklab, var(--status-progress) 14%, var(--bg-panel));
+  color: var(--status-progress);
+  border: 1px solid color-mix(in oklab, var(--status-progress) 30%, var(--border));
+}
+.lock-pill :deep(svg) { width: 11px; height: 11px; }
+.lock-pill.done {
+  background: color-mix(in oklab, var(--status-done) 14%, var(--bg-panel));
+  color: var(--status-done);
+  border-color: color-mix(in oklab, var(--status-done) 30%, var(--border));
+}
+
+/* ===== Body ===== */
+.panel-body {
+  flex: 1; overflow-y: auto;
+  padding: 20px 24px;
+  display: flex; flex-direction: column;
+  gap: 20px;
+}
+
+.panel-title {
+  font-size: 20px; font-weight: 600; line-height: 1.3;
+  color: var(--fg);
+  border: 1px solid transparent;
   border-radius: 6px;
+  padding: 6px 8px; margin: -6px -8px;
+  cursor: text; word-break: break-word;
+}
+.panel-title:hover { background: var(--bg-hover); }
+.panel-title:focus { outline: none; border-color: var(--accent); background: var(--bg-panel); }
+.panel-title:empty::before { content: attr(data-placeholder); color: var(--fg-subtle); }
+
+.panel-section { display: flex; flex-direction: column; gap: 8px; }
+.panel-section-title {
+  font-size: 12px; color: var(--fg-muted); font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.04em; line-height: 1;
+}
+.section-head { display: flex; align-items: center; justify-content: space-between; }
+.head-left    { display: flex; align-items: center; gap: 6px; }
+.count-mono   { font-size: 11px; color: var(--fg-subtle); font-family: var(--font-mono); }
+
+/* ===== Banners ===== */
+.banner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font-size: 13px;
+  border-radius: 6px;
+}
+.banner .text  { flex: 1; }
+.banner-done   {
+  background: color-mix(in oklab, var(--status-done) 10%, var(--bg-panel));
+  border-color: color-mix(in oklab, var(--status-done) 25%, var(--border));
+}
+.banner-done .icon-done :deep(*) { stroke: var(--status-done); }
+.banner-done .icon-done { color: var(--status-done); }
+
+/* ===== Props grid ===== */
+.props {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  row-gap: 6px;
+  align-items: center;
+  font-size: 13px;
+}
+.props .key { color: var(--fg-muted); }
+.props .val { color: var(--fg); min-width: 0; }
+
+.prop-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 2px 6px; border-radius: 4px;
   cursor: pointer;
   border: 1px solid transparent;
+  margin: -2px -6px;
   font-size: 13px;
-  color: var(--fg);
-  transition: background 80ms, border-color 80ms;
-  background: transparent;
 }
-.prop-pill:hover {
-  background: var(--bg-hover);
-  border-color: var(--border);
+.prop-pill:hover { background: var(--bg-hover); border-color: var(--border); }
+.prop-pill > .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.prop-pill .dim :deep(svg),
+.prop-pill > .dim { width: 13px; height: 13px; color: var(--fg-muted); }
+.sprint-val { display: inline-flex; align-items: center; gap: 6px; }
+.sprint-val .dim :deep(svg) { width: 13px; height: 13px; color: var(--fg-muted); }
+
+.muted { color: var(--fg-muted); }
+.subtle { color: var(--fg-subtle); }
+.small { font-size: 12px; }
+.small-pad { font-size: 13px; padding: 8px 0; color: var(--fg-muted); }
+
+.avatar-empty {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--bg-active); color: var(--fg-subtle);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px;
 }
 
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--accent);
-  color: var(--accent-fg);
-  border: none;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 80ms;
-}
-.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--bg-panel);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 80ms;
-}
-.btn-secondary:hover { background: var(--bg-hover); }
-
-.btn-ghost {
-  background: transparent;
-  border: 1px solid var(--border);
+.tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag {
+  display: inline-flex; align-items: center;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg-sunken);
   color: var(--fg-muted);
+  border: 1px solid var(--border);
+}
+
+/* Menus, items used inside <MenuItem> default slot */
+.check-slot { width: 14px; display: inline-flex; align-items: center; }
+.check      { width: 14px; height: 14px; color: var(--accent); }
+.menu-label { font-size: 12px; color: var(--fg-subtle); padding: 6px 8px 2px; font-weight: 500; }
+.menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+.dropdown-pad { padding: 4px 8px 8px; }
+.date-fields  { display: flex; flex-direction: column; gap: 8px; }
+.field-block  { display: flex; flex-direction: column; gap: 4px; }
+.field-label  { font-size: 11px; color: var(--fg-muted); }
+.clear-btn    { align-self: flex-start; }
+
+/* ===== Subtasks ===== */
+.subtask-progress { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.subtask-progress .bar { height: 100%; background: var(--status-done); border-radius: 2px; transition: width 220ms; }
+.subtask-list { display: flex; flex-direction: column; }
+.subtask-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.subtask-row:last-child { border-bottom: none; }
+.subtask-check {
+  width: 16px; height: 16px; border-radius: 4px;
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  flex-shrink: 0;
+  display: grid; place-items: center;
+  cursor: pointer; padding: 0;
+  transition: background 100ms, border 100ms;
+}
+.subtask-check.done {
+  background: var(--status-done);
+  border-color: var(--status-done);
+  color: #fff;
+}
+.subtask-check.empty { cursor: default; }
+.subtask-check :deep(svg) { width: 10px; height: 10px; }
+.subtask-check:disabled { cursor: default; }
+.subtask-title {
+  flex: 1; min-width: 0; font-size: 13px;
+  color: var(--fg);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.subtask-title.done { color: var(--fg-subtle); text-decoration: line-through; }
+.subtask-key {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--fg-subtle); flex-shrink: 0;
+}
+.subtask-add-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+.subtask-add-row .input { height: 28px; font-size: 13px; padding: 0 8px; flex: 1; }
+
+.subtask-title { cursor: pointer; }
+.subtask-title:hover:not(.done) { color: var(--accent); }
+.subtask-chips {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+}
+.subtask-due {
+  font-size: 11px; font-family: var(--font-mono);
+  color: var(--fg-subtle); white-space: nowrap;
+}
+.subtask-prio {
+  width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+}
+.subtask-remove {
+  background: none; border: none; padding: 2px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--fg-subtle); cursor: pointer; flex-shrink: 0;
+}
+.subtask-remove:hover { color: var(--fg); }
+.subtask-remove :deep(svg) { width: 11px; height: 11px; }
+
+/* Subtask detail layer (slides over) */
+.side-panel.subtask-layer        { z-index: 300; }
+.side-panel-backdrop.subtask-layer { z-index: 299; }
+
+.crumb {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--fg-muted); font-size: 12px;
+  max-width: 100%; min-width: 0;
+}
+.crumb-text {
+  max-width: 220px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.spacer { flex: 1; }
+
+.subtask-kicker {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--fg-subtle);
+  margin-bottom: -8px;
+}
+.panel-title.static {
+  cursor: default;
+}
+.panel-title.static:hover { background: transparent; }
+
+.dim { color: var(--fg-muted); }
+.dim :deep(svg) { width: 13px; height: 13px; color: var(--fg-muted); }
+
+/* ===== Description ===== */
+.description {
+  font-size: 14px; line-height: 1.6;
+  color: var(--fg);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 8px; margin: -8px;
+  cursor: text;
+  white-space: pre-wrap;
+  min-height: 60px;
+}
+.description:hover { background: var(--bg-hover); }
+.description:focus { outline: none; border-color: var(--accent); background: var(--bg-panel); }
+.description.empty::before { content: "Add description…"; color: var(--fg-subtle); }
+.description:focus.empty::before { content: ""; }
+
+/* ===== Tabs ===== */
+.minitabs {
+  display: flex; gap: 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.minitab {
+  font-size: 13px; color: var(--fg-muted);
+  padding: 8px 0;
+  border: none; background: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer; font-weight: 500;
+  font-family: inherit;
+}
+.minitab:hover  { color: var(--fg); }
+.minitab.active { color: var(--fg); border-bottom-color: var(--accent); }
+.minitab .badge {
+  font-size: 11px;
+  background: var(--bg-active);
+  color: var(--fg-muted);
+  border-radius: 8px;
+  padding: 0 5px; margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vstack       { display: flex; flex-direction: column; gap: 4px; }
+.vstack-tight { display: flex; flex-direction: column; }
+.hstack-end   { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+
+/* ===== Comments ===== */
+.comment {
+  display: flex; gap: 12px;
+  padding: 8px 0;
+}
+.comment .body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.comment .author-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.comment .author { font-weight: 600; font-size: 13px; }
+.comment .time   { font-size: 12px; color: var(--fg-subtle); }
+.comment .text   { font-size: 14px; line-height: 1.5; color: var(--fg); white-space: pre-wrap; word-break: break-word; }
+.comment .actions { display: flex; gap: 12px; margin-top: 4px; }
+.comment .actions button {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-size: 12px; color: var(--fg-muted); font-weight: 500;
+  font-family: inherit;
+}
+.comment .actions button:hover { color: var(--fg); }
+
+.thread-replies {
+  margin-left: 36px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
+  margin-top: 4px;
+  display: flex; flex-direction: column;
+}
+
+.composer { display: flex; gap: 12px; margin-top: 12px; }
+.composer .body { flex: 1; display: flex; flex-direction: column; }
+.composer .send-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 8px;
+}
+
+/* ===== Audit ===== */
+.audit-row {
+  display: flex; gap: 12px;
+  padding: 8px 0;
+  font-size: 13px;
+  align-items: flex-start;
+}
+.audit-row .dot-col {
+  width: 24px; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center;
+  position: relative;
+}
+.audit-row .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border-strong); margin-top: 7px;
+}
+.audit-row .line {
+  position: absolute; top: 14px; bottom: -8px; left: 50%;
+  width: 1px; background: var(--border);
+  transform: translateX(-50%);
+}
+.audit-row:last-child .line { display: none; }
+.audit-row .text { flex: 1; color: var(--fg-muted); }
+.audit-row .text strong { color: var(--fg); font-weight: 600; }
+.audit-row .time { font-size: 12px; color: var(--fg-subtle); white-space: nowrap; }
+
+/* ===== Inputs ===== */
+.input {
+  display: flex; align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  border-radius: 6px;
+  font-size: 13px;
+  width: 100%;
+  color: var(--fg);
+  font-family: inherit;
+}
+.input:focus  { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input::placeholder { color: var(--fg-subtle); }
+.textarea     { height: auto; min-height: 64px; padding: 8px 12px; resize: vertical; line-height: 1.5; }
+input[type="date"].input { padding: 0 8px; height: 28px; font-size: 13px; }
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 12px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 13px; font-weight: 500;
   cursor: pointer;
-  font-weight: 500;
+  border: 1px solid transparent;
+  background: none; color: inherit;
+  font-family: inherit;
+  white-space: nowrap;
   transition: background 80ms;
 }
-.btn-ghost:hover { background: var(--bg-hover); color: var(--fg); }
+.btn:disabled       { opacity: 0.5; cursor: not-allowed; }
+.btn.primary        { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn.secondary      { background: var(--bg-panel); color: var(--fg); border-color: var(--border); }
+.btn.secondary:hover:not(:disabled) { background: var(--bg-hover); }
+.btn.ghost          { color: var(--fg-muted); }
+.btn.ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--fg); }
+.btn.sm             { height: 24px; padding: 0 8px; font-size: 12px; }
+.btn.icon-only      { padding: 0; width: 28px; justify-content: center; }
+.btn.icon-only.sm   { width: 24px; }
+.btn :deep(svg)     { width: 14px; height: 14px; }
+
+.kbd {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-mono); font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg-sunken);
+  color: var(--fg-muted);
+}
 </style>

@@ -1,74 +1,45 @@
 <template>
   <div
-    :class="['rounded-lg border cursor-pointer flex flex-col gap-1.5 transition-all', dragging ? 'card-dragging' : '']"
-    :style="{
-      background: 'var(--bg-panel)',
-      borderColor: 'var(--border)',
-      padding: '12px',
-      boxShadow: 'var(--shadow-sm)',
-    }"
+    :class="['card', dragging ? 'dragging' : '', task.completed ? 'completed' : '']"
     draggable="true"
     @dragstart="onDragStart"
     @dragend="$emit('dragEnd')"
     @click.stop="$emit('open', task.id)"
   >
     <!-- ID row -->
-    <div class="flex items-center gap-2">
-      <span class="text-xs font-mono" style="color:var(--fg-subtle)">{{ task.key }}</span>
+    <div class="card-id-row">
+      <span>{{ task.key }}</span>
       <PriorityBadge :priority="task.priority" />
-      <span
-        v-if="task.completed"
-        class="ml-auto inline-flex items-center gap-1 text-[11px] font-medium"
-        style="color:var(--status-done)"
-      >
-        <CheckIcon class="w-3 h-3" /> Completed
-      </span>
     </div>
 
     <!-- Title -->
-    <div
-      class="text-sm font-medium leading-snug"
-      :class="task.completed ? 'line-through' : ''"
-      :style="task.completed ? 'color:var(--fg-muted)' : 'color:var(--fg)'"
-    >{{ task.title }}</div>
+    <div class="card-title">{{ task.title }}</div>
 
     <!-- Tags -->
-    <div v-if="task.tags?.length" class="flex flex-wrap gap-1">
-      <span
-        v-for="tag in task.tags"
-        :key="tag"
-        class="text-[11px] px-1.5 py-0.5 rounded border"
-        style="background:var(--bg-sunken);color:var(--fg-muted);border-color:var(--border)"
-      >{{ tag }}</span>
+    <div v-if="task.tags?.length" class="tags">
+      <span v-for="tag in task.tags" :key="tag" class="tag">{{ tag }}</span>
     </div>
 
     <!-- Meta row -->
-    <div class="flex items-center gap-2 mt-0.5">
-      <span
-        v-if="task.due_date"
-        class="inline-flex items-center gap-1 text-xs"
-        style="color:var(--fg-muted)"
-      >
-        <CalendarIcon class="w-3 h-3" />
-        {{ formatDate(task.start_date, task.due_date) }}
+    <div class="card-meta">
+      <span v-if="task.due_date" :class="['chip', isDeadlineUrgent ? 'urgent' : '']">
+        <CalendarIcon class="w-4 h-4" />
+        {{ dueDateLabel }}
       </span>
-      <span
-        v-if="task.comments?.length"
-        class="inline-flex items-center gap-1 text-xs"
-        style="color:var(--fg-muted)"
-      >
-        <CommentIcon class="w-3 h-3" />{{ task.comments.length }}
+      <span v-if="task.comments?.length" class="chip">
+        <CommentIcon class="w-4 h-4" />{{ task.comments.length }}
       </span>
-      <span class="flex-1" />
+      <span class="spacer" />
       <Avatar v-if="task.assignee" :name="task.assignee.name" size="sm" />
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import Avatar from '@/Components/UI/Avatar.vue'
 import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
-import { CheckIcon, CalendarIcon, CommentIcon } from '@/Components/UI/Icons.vue'
+import { CalendarIcon, CommentIcon } from '@/Components/UI/Icons.vue'
 
 const props = defineProps({
   task:     { type: Object, required: true },
@@ -81,15 +52,34 @@ function onDragStart(e) {
   emit('dragStart', props.task.id)
 }
 
-function formatDate(start, due) {
-  if (!due) return ''
-  if (start && start !== due) return `${fmtD(start)}–${fmtD(due)}`
-  return fmtD(due)
-}
-
 function fmtD(d) {
   if (!d) return ''
   const date = new Date(d)
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
+
+// Deadline urgency
+const deadlineDiff = computed(() => {
+  if (!props.task.due_date) return null
+  const due = new Date(props.task.due_date)
+  due.setHours(23, 59, 59, 999)
+  return Math.ceil((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+})
+
+const isDeadlineUrgent = computed(() =>
+  !props.task.completed && deadlineDiff.value !== null && deadlineDiff.value <= 1
+)
+
+const dueDateLabel = computed(() => {
+  const { start_date, due_date } = props.task
+  if (!due_date) return ''
+  if (start_date && start_date !== due_date) return `${fmtD(start_date)}–${fmtD(due_date)}`
+  const d = deadlineDiff.value
+  if (props.task.completed || d === null) return fmtD(due_date)
+  if (d < 0) return Math.abs(d) === 1 ? '1 day overdue' : `${Math.abs(d)} days overdue`
+  if (d === 0) return 'today'
+  if (d === 1) return 'tomorrow'
+  return fmtD(due_date)
+})
+
 </script>
