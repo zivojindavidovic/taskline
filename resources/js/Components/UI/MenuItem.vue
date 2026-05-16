@@ -8,7 +8,7 @@
       disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-[var(--bg-hover)]',
     ]"
     :style="!danger ? 'color:var(--fg)' : ''"
-    @click="!disabled && $emit('click')"
+    @click="e => !disabled && $emit('click', e)"
   >
     <slot />
   </button>

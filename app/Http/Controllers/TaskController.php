@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AuditLog;
-use App\Models\BoardColumn;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskAttachment;
+use App\Services\TaskService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -16,6 +15,8 @@ use Inertia\Response;
 
 class TaskController extends Controller
 {
+    public function __construct(private TaskService $taskService) {}
+
     public function store(Request $request): RedirectResponse
     {
         $project = Project::findOrFail($request->input('project_id'));
@@ -60,7 +61,7 @@ class TaskController extends Controller
             }
         }
 
-        AuditLog::create([
+        \App\Models\AuditLog::create([
             'user_id'    => auth()->id(),
             'project_id' => $project->id,
             'task_id'    => $task->id,
@@ -73,6 +74,7 @@ class TaskController extends Controller
 
     public function update(Request $request, Task $task): RedirectResponse
     {
+        $this->authorizeTaskAccess($task);
         $workspaceUserIds = $this->workspaceUserIds($task->project);
 
         $data = $request->validate([
@@ -81,6 +83,7 @@ class TaskController extends Controller
             'priority'        => 'sometimes|in:urgent,high,med,low',
             'assignee_id'     => ['sometimes', 'nullable', Rule::in(array_merge([null], $workspaceUserIds))],
             'tags'            => 'sometimes|nullable|array',
+            'tags.*'          => 'string|max:50',
             'board_column_id' => 'sometimes|nullable|exists:board_columns,id',
             'sprint_id'       => 'sometimes|nullable|exists:sprints,id',
             'project_id'      => 'sometimes|exists:projects,id',
@@ -88,38 +91,7 @@ class TaskController extends Controller
             'due_date'        => 'sometimes|nullable|date',
         ]);
 
-        // Determine audit action
-        $action = null;
-        if (isset($data['board_column_id']) && $data['board_column_id'] != $task->board_column_id) {
-            $col    = BoardColumn::find($data['board_column_id']);
-            $action = 'task.moved';
-            $meta   = ['column' => $col?->name];
-        } elseif (array_key_exists('assignee_id', $data)) {
-            $action = 'task.assigned';
-            $meta   = ['assignee_id' => $data['assignee_id']];
-        } elseif (isset($data['priority'])) {
-            $action = 'task.priority_changed';
-            $meta   = ['priority' => $data['priority']];
-        } elseif (isset($data['title'])) {
-            $action = 'task.renamed';
-            $meta   = ['title' => $data['title']];
-        } elseif (isset($data['tags'])) {
-            $action = 'task.tags_updated';
-            $meta   = ['tags' => $data['tags']];
-        } else {
-            $action = 'task.updated';
-            $meta   = [];
-        }
-
-        $task->update($data);
-
-        AuditLog::create([
-            'user_id'    => auth()->id(),
-            'project_id' => $task->project_id,
-            'task_id'    => $task->id,
-            'action'     => $action,
-            'meta'       => $meta ?? [],
-        ]);
+        $this->taskService->update($task, $data, auth()->id());
 
         return back();
     }
@@ -130,16 +102,7 @@ class TaskController extends Controller
             'board_column_id' => 'required|exists:board_columns,id',
         ]);
 
-        $col = BoardColumn::findOrFail($data['board_column_id']);
-        $task->update($data);
-
-        AuditLog::create([
-            'user_id'    => auth()->id(),
-            'project_id' => $task->project_id,
-            'task_id'    => $task->id,
-            'action'     => 'task.moved',
-            'meta'       => ['column' => $col->name],
-        ]);
+        $this->taskService->update($task, $data, auth()->id());
 
         return back();
     }
@@ -152,7 +115,7 @@ class TaskController extends Controller
             'completed_by' => auth()->id(),
         ]);
 
-        AuditLog::create([
+        \App\Models\AuditLog::create([
             'user_id'    => auth()->id(),
             'project_id' => $task->project_id,
             'task_id'    => $task->id,
@@ -170,7 +133,7 @@ class TaskController extends Controller
             'completed_by' => null,
         ]);
 
-        AuditLog::create([
+        \App\Models\AuditLog::create([
             'user_id'    => auth()->id(),
             'project_id' => $task->project_id,
             'task_id'    => $task->id,
@@ -180,50 +143,69 @@ class TaskController extends Controller
         return back();
     }
 
-    public function storeSubtask(Request $request, Task $parent): RedirectResponse
+    public function storeSubtask(Request $request, Task $task): RedirectResponse
     {
+        $this->authorizeTaskAccess($task);
+
         $data = $request->validate([
             'title'    => 'required|string|max:255',
-            'priority' => 'required|in:urgent,high,med,low',
+            'priority' => 'nullable|in:urgent,high,med,low',
         ]);
 
-        $project = $parent->project;
-        $taskNum = $project->tasks()->count() + 1;
+        $this->taskService->createSubtask(
+            $task,
+            $data['title'],
+            $data['priority'] ?? null,
+            auth()->id()
+        );
 
-        $subtask = Task::create([
-            'key'             => $project->key . '-' . $taskNum,
-            'title'           => $data['title'],
-            'priority'        => $data['priority'],
-            'project_id'      => $parent->project_id,
-            'sprint_id'       => $parent->sprint_id,
-            'board_column_id' => $parent->board_column_id,
-            'parent_task_id'  => $parent->id,
-            'created_by'      => auth()->id(),
+        return back();
+    }
+
+    public function updateSubtask(Request $request, Task $task, Task $subtask): RedirectResponse
+    {
+        $this->authorizeTaskAccess($task);
+        abort_unless($subtask->parent_task_id === $task->id, 404);
+
+        $data = $request->validate([
+            'title'       => 'sometimes|string|max:255',
+            'priority'    => 'sometimes|in:urgent,high,med,low',
+            'assignee_id' => 'sometimes|nullable|integer|exists:users,id',
+            'due_date'    => 'sometimes|nullable|date',
+            'tags'        => 'sometimes|nullable|array',
+            'tags.*'      => 'string|max:50',
+            'description' => 'sometimes|nullable|string',
         ]);
 
-        AuditLog::create([
-            'user_id'    => auth()->id(),
-            'project_id' => $parent->project_id,
-            'task_id'    => $parent->id,
-            'action'     => 'task.subtask_added',
-            'meta'       => ['subtask_key' => $subtask->key, 'title' => $subtask->title],
-        ]);
+        $this->taskService->updateSubtask($task, $subtask, $data, auth()->id());
 
         return back();
     }
 
     public function destroy(Task $task): RedirectResponse
     {
+        $this->authorizeTaskAccess($task);
         $key = $task->key;
-        $task->delete();
+        $this->taskService->delete($task);
 
         return back()->with('success', "Task {$key} deleted.");
+    }
+
+    private function authorizeTaskAccess(Task $task): void
+    {
+        $user    = auth()->user();
+        $project = $task->project;
+        abort_unless(
+            $project->owner_id === $user->id ||
+            $project->members()->where('users.id', $user->id)->exists(),
+            403
+        );
     }
 
     private function workspaceUserIds(Project $project): array
     {
         $workspace = $project->workspace;
-        $ids = $workspace->users()->pluck('users.id')->all();
+        $ids = $workspace->users()->get()->pluck('id')->toArray();
         if (!in_array($workspace->owner_id, $ids)) {
             $ids[] = $workspace->owner_id;
         }

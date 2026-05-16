@@ -125,6 +125,10 @@ class ProjectController extends Controller
         }
         $allUsers = $members->map(fn ($m) => is_array($m) ? $m : $m->only(['id', 'name', 'email']));
 
+        $allProjects = $workspace->projects()
+            ->orderBy('name')
+            ->get(['id', 'name', 'key', 'color']);
+
         return Inertia::render('Projects/Show', [
             'project'       => $project->only(['id', 'name', 'key', 'color']),
             'currentSprint' => $sprint,
@@ -134,6 +138,7 @@ class ProjectController extends Controller
             'columns'       => $columns,
             'tasks'         => $tasks,
             'allUsers'      => $allUsers,
+            'allProjects'   => $allProjects,
             'savedFilters'  => $savedFilters,
         ]);
     }

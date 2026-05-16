@@ -285,6 +285,8 @@
       :task="activeTask"
       :columns="columns"
       :allUsers="allUsers"
+      :allProjects="allProjects"
+      :allSprints="sprints"
       :project="project"
       :locked="currentSprint?.locked ?? false"
       @close="closeTask"
@@ -296,6 +298,8 @@
       @reply="postReply"
       @subtask="addSubtask"
       @subtaskToggle="toggleSubtask"
+      @subtaskRemove="removeSubtask"
+      @subtaskUpdate="handleSubtaskUpdate"
       @attachmentUpload="uploadAttachment"
       @attachmentRemove="removeAttachment"
     />
@@ -359,6 +363,7 @@ const props = defineProps({
   columns:       { type: Array,  default: () => [] },
   tasks:         { type: Array,  default: () => [] },
   allUsers:      { type: Array,  default: () => [] },
+  allProjects:   { type: Array,  default: () => [] },
   savedFilters:  {
     type: Object,
     default: () => ({
@@ -707,6 +712,16 @@ function addSubtask(data) {
 function toggleSubtask(subtaskId, completed) {
   const routeName = completed ? 'tasks.complete' : 'tasks.uncomplete'
   router.post(route(routeName, subtaskId), {}, { preserveScroll: true })
+}
+
+function removeSubtask(subtaskId) {
+  router.delete(route('tasks.destroy', subtaskId), { preserveScroll: true })
+}
+
+function handleSubtaskUpdate(subtaskId, data) {
+  router.patch(route('tasks.subtasks.update', [activeTask.value.id, subtaskId]), data, {
+    preserveScroll: true,
+  })
 }
 
 function uploadAttachment(file) {

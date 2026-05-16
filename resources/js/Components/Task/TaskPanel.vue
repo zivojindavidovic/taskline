@@ -174,9 +174,37 @@
           </div>
 
           <div class="key">Sprint</div>
-          <div class="val sprint-val">
-            <LightningIcon class="dim" />
-            <span>{{ task.sprint?.name ?? '—' }}</span>
+          <div class="val">
+            <DropdownMenu :width="220">
+              <template #trigger>
+                <span class="prop-pill">
+                  <LightningIcon class="dim" />
+                  <span>{{ task.sprint?.name ?? '—' }}</span>
+                </span>
+              </template>
+              <div>
+                <div class="menu-label">Assign to sprint</div>
+                <MenuItem
+                  :disabled="locked"
+                  @click="!locked && $emit('update', { sprint_id: null })"
+                >
+                  <span class="check-slot"><CheckIcon v-if="!task.sprint_id" class="check" /></span>
+                  <span class="muted">No sprint (backlog)</span>
+                </MenuItem>
+                <div v-if="allSprints.length" class="menu-divider" />
+                <MenuItem
+                  v-for="s in allSprints"
+                  :key="s.id"
+                  :disabled="locked || s.locked"
+                  @click="!locked && !s.locked && $emit('update', { sprint_id: s.id })"
+                >
+                  <span class="check-slot"><CheckIcon v-if="s.id === task.sprint_id" class="check" /></span>
+                  <LightningIcon style="width:13px;height:13px;color:var(--fg-muted)" />
+                  <span>{{ s.name }}</span>
+                  <span v-if="s.locked" style="margin-left:auto;font-size:11px;color:var(--fg-subtle)">locked</span>
+                </MenuItem>
+              </div>
+            </DropdownMenu>
           </div>
 
           <div class="key">Dates</div>
@@ -254,7 +282,7 @@
                 <MenuItem
                   v-if="canAddDraftTag"
                   :disabled="locked"
-                  @click.stop="!locked && addNewTag()"
+                  @click="!locked && addNewTag()"
                 >
                   <span class="check-slot"><PlusIcon class="check" /></span>
                   <span>Create <strong>{{ normalizeTag(tagSearch) }}</strong></span>
@@ -265,7 +293,7 @@
                   :key="tag"
                   :disabled="locked"
                   data-keep-open
-                  @click.stop="!locked && toggleTag(tag)"
+                  @click="!locked && toggleTag(tag)"
                 >
                   <span class="check-slot"><CheckIcon v-if="task.tags?.includes(tag)" class="check" /></span>
                   <span>{{ tag }}</span>
@@ -525,47 +553,162 @@
 
         <div class="panel-section">
           <div class="props">
+            <!-- Assignee -->
             <div class="key">Assignee</div>
             <div class="val">
-              <span class="prop-pill">
-                <template v-if="openSubtask.assignee">
-                  <Avatar :name="openSubtask.assignee.name" size="sm" />
-                  <span>{{ openSubtask.assignee.name }}</span>
+              <DropdownMenu :width="220">
+                <template #trigger>
+                  <span class="prop-pill">
+                    <template v-if="openSubtask.assignee">
+                      <Avatar :name="openSubtask.assignee.name" size="sm" />
+                      <span>{{ openSubtask.assignee.name }}</span>
+                    </template>
+                    <template v-else>
+                      <span class="avatar-empty">?</span>
+                      <span class="muted">Unassigned</span>
+                    </template>
+                  </span>
                 </template>
-                <template v-else>
-                  <span class="avatar-empty">?</span>
-                  <span class="muted">Unassigned</span>
-                </template>
-              </span>
+                <div>
+                  <div class="menu-label">Assign to</div>
+                  <MenuItem :disabled="locked" @click="!locked && emit('subtaskUpdate', openSubtask.id, { assignee_id: null })">
+                    <span class="check-slot"><CheckIcon v-if="!openSubtask.assignee_id" class="check" /></span>
+                    Unassigned
+                  </MenuItem>
+                  <div class="menu-divider" />
+                  <MenuItem
+                    v-for="u in allUsers"
+                    :key="u.id"
+                    :disabled="locked"
+                    @click="!locked && emit('subtaskUpdate', openSubtask.id, { assignee_id: u.id })"
+                  >
+                    <span class="check-slot"><CheckIcon v-if="u.id === openSubtask.assignee_id" class="check" /></span>
+                    <Avatar :name="u.name" size="sm" />
+                    <span>{{ u.name }}</span>
+                  </MenuItem>
+                </div>
+              </DropdownMenu>
             </div>
 
+            <!-- Priority -->
             <div class="key">Priority</div>
             <div class="val">
-              <span class="prop-pill"><PriorityBadge :priority="openSubtask.priority || 'med'" show-label /></span>
+              <DropdownMenu>
+                <template #trigger>
+                  <span class="prop-pill"><PriorityBadge :priority="openSubtask.priority || 'med'" show-label /></span>
+                </template>
+                <div>
+                  <MenuItem
+                    v-for="p in PRIORITIES"
+                    :key="p.id"
+                    :disabled="locked"
+                    @click="!locked && emit('subtaskUpdate', openSubtask.id, { priority: p.id })"
+                  >
+                    <span class="check-slot"><CheckIcon v-if="p.id === (openSubtask.priority || 'med')" class="check" /></span>
+                    <PriorityBadge :priority="p.id" show-label />
+                  </MenuItem>
+                </div>
+              </DropdownMenu>
             </div>
 
+            <!-- Due date -->
             <div class="key">Due date</div>
             <div class="val">
-              <span class="prop-pill">
-                <CalendarIcon class="dim" />
-                <span v-if="openSubtask.due_date">{{ formatDate(openSubtask.due_date) }}</span>
-                <span v-else class="muted">Not set</span>
-              </span>
+              <DropdownMenu :width="240">
+                <template #trigger>
+                  <span class="prop-pill">
+                    <CalendarIcon class="dim" />
+                    <span v-if="openSubtask.due_date">{{ formatDate(openSubtask.due_date) }}</span>
+                    <span v-else class="muted">Not set</span>
+                  </span>
+                </template>
+                <div class="dropdown-pad" @click.stop>
+                  <div class="menu-label">Due date</div>
+                  <div class="date-fields">
+                    <label class="field-block">
+                      <span class="field-label">Due</span>
+                      <input
+                        type="date"
+                        :value="dateValue(openSubtask.due_date)"
+                        :disabled="locked"
+                        class="input"
+                        @change="e => !locked && emit('subtaskUpdate', openSubtask.id, { due_date: e.target.value || null })"
+                      />
+                    </label>
+                    <button
+                      v-if="openSubtask.due_date"
+                      type="button"
+                      class="btn ghost sm clear-btn"
+                      :disabled="locked"
+                      @click="!locked && emit('subtaskUpdate', openSubtask.id, { due_date: null })"
+                    >
+                      <CloseIcon /> Clear
+                    </button>
+                  </div>
+                </div>
+              </DropdownMenu>
             </div>
 
+            <!-- Tags -->
             <div class="key">Tags</div>
             <div class="val">
-              <span v-if="openSubtask.tags?.length" class="tags">
-                <span v-for="t in openSubtask.tags" :key="t" class="tag">{{ t }}</span>
-              </span>
-              <span v-else class="muted">—</span>
+              <DropdownMenu :width="220" keep-open>
+                <template #trigger>
+                  <span class="prop-pill">
+                    <span v-if="openSubtask.tags?.length" class="tags">
+                      <span v-for="t in openSubtask.tags" :key="t" class="tag">{{ t }}</span>
+                    </span>
+                    <span v-else class="muted">+ Add tags</span>
+                  </span>
+                </template>
+                <div>
+                  <div class="menu-label">Tags</div>
+                  <div class="dropdown-pad" @click.stop>
+                    <input
+                      v-model="subtaskTagSearch"
+                      class="input"
+                      autofocus
+                      placeholder="Find or create a tag…"
+                      @keydown.enter.prevent="subtaskAddNewTag"
+                      @keydown.stop
+                    />
+                  </div>
+                  <MenuItem
+                    v-if="subtaskCanAddDraftTag"
+                    :disabled="locked"
+                    @click="!locked && subtaskAddNewTag()"
+                  >
+                    <span class="check-slot"><PlusIcon class="check" /></span>
+                    <span>Create <strong>{{ normalizeTag(subtaskTagSearch) }}</strong></span>
+                  </MenuItem>
+                  <div v-if="subtaskFilteredTagOptions.length === 0 && !subtaskCanAddDraftTag" class="muted small-pad">No matches</div>
+                  <MenuItem
+                    v-for="tag in subtaskFilteredTagOptions"
+                    :key="tag"
+                    :disabled="locked"
+                    data-keep-open
+                    @click="!locked && subtaskToggleTag(tag)"
+                  >
+                    <span class="check-slot"><CheckIcon v-if="openSubtask.tags?.includes(tag)" class="check" /></span>
+                    <span>{{ tag }}</span>
+                  </MenuItem>
+                </div>
+              </DropdownMenu>
             </div>
           </div>
         </div>
 
+        <!-- Description -->
         <div class="panel-section">
           <div class="panel-section-title">Description</div>
-          <div class="description" :class="{ empty: !openSubtask.description }">{{ openSubtask.description || '' }}</div>
+          <div
+            ref="subtaskDescEl"
+            class="description"
+            :class="{ empty: !openSubtask.description }"
+            :contenteditable="!locked"
+            spellcheck="false"
+            @blur="onSubtaskDescBlur"
+          >{{ openSubtask.description || '' }}</div>
         </div>
       </div>
     </div>
@@ -586,22 +729,28 @@ import {
 } from '@/Components/UI/Icons.vue'
 
 const props = defineProps({
-  task:     { type: Object, required: true },
-  columns:  { type: Array,  default: () => [] },
-  allUsers: { type: Array,  default: () => [] },
-  project:  { type: Object, default: null },
-  locked:   { type: Boolean, default: false },
+  task:        { type: Object,  required: true },
+  columns:     { type: Array,   default: () => [] },
+  allUsers:    { type: Array,   default: () => [] },
+  allProjects: { type: Array,   default: () => [] },
+  allSprints:  { type: Array,   default: () => [] },
+  project:     { type: Object,  default: null },
+  locked:      { type: Boolean, default: false },
 })
 const emit = defineEmits([
   'close', 'update', 'comment', 'reply',
   'complete', 'uncomplete', 'delete',
-  'subtask', 'subtaskToggle', 'subtaskRemove',
+  'subtask', 'subtaskToggle', 'subtaskRemove', 'subtaskUpdate',
   'attachmentUpload', 'attachmentRemove',
 ])
 
 const hoveredSubtaskId = ref(null)
 const openSubtaskId    = ref(null)
 const openSubtask      = computed(() => props.task.subtasks?.find(s => s.id === openSubtaskId.value) || null)
+
+const taskProject = computed(() =>
+  props.allProjects.find(p => p.id === (props.task.project_id ?? props.project?.id)) ?? props.project
+)
 
 const PRIORITY_COLORS = {
   urgent: '#dc2626',
@@ -663,6 +812,46 @@ function toggleTag(tag) {
   const idx  = tags.indexOf(tag)
   if (idx === -1) tags.push(tag); else tags.splice(idx, 1)
   emit('update', { tags })
+}
+
+const subtaskTagSearch = ref('')
+const subtaskDescEl   = ref(null)
+
+const subtaskAllTagOptions = computed(() => {
+  const extra = openSubtask.value?.tags ?? []
+  return [...new Set([...ALL_TAGS, ...extra])]
+})
+const subtaskFilteredTagOptions = computed(() => {
+  const q = subtaskTagSearch.value.trim().toLowerCase()
+  if (!q) return subtaskAllTagOptions.value
+  return subtaskAllTagOptions.value.filter(t => t.includes(q))
+})
+const subtaskCanAddDraftTag = computed(() => {
+  const n = normalizeTag(subtaskTagSearch.value)
+  return n && !subtaskAllTagOptions.value.includes(n)
+})
+
+function subtaskAddNewTag() {
+  const t = normalizeTag(subtaskTagSearch.value)
+  if (!t || !openSubtask.value) return
+  const tags = [...(openSubtask.value.tags ?? [])]
+  if (!tags.includes(t)) tags.push(t)
+  emit('subtaskUpdate', openSubtask.value.id, { tags })
+  subtaskTagSearch.value = ''
+}
+function subtaskToggleTag(tag) {
+  if (!openSubtask.value) return
+  const tags = [...(openSubtask.value.tags ?? [])]
+  const idx  = tags.indexOf(tag)
+  if (idx === -1) tags.push(tag); else tags.splice(idx, 1)
+  emit('subtaskUpdate', openSubtask.value.id, { tags })
+}
+function onSubtaskDescBlur(e) {
+  if (!openSubtask.value) return
+  const val = e.target.innerText
+  if (val !== (openSubtask.value.description ?? '')) {
+    emit('subtaskUpdate', openSubtask.value.id, { description: val })
+  }
 }
 
 const completedSubtasksCount = computed(() => props.task.subtasks?.filter(s => s.completed).length ?? 0)
