@@ -14,9 +14,7 @@ class ProfileTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this
-            ->actingAs($user)
-            ->get('/profile');
+        $response = $this->actingAs($user)->get('/profile');
 
         $response->assertOk();
     }
@@ -28,7 +26,7 @@ class ProfileTest extends TestCase
         $response = $this
             ->actingAs($user)
             ->patch('/profile', [
-                'name' => 'Test User',
+                'name'  => 'Test User',
                 'email' => 'test@example.com',
             ]);
 
@@ -50,7 +48,7 @@ class ProfileTest extends TestCase
         $response = $this
             ->actingAs($user)
             ->patch('/profile', [
-                'name' => 'Test User',
+                'name'  => 'Test User',
                 'email' => $user->email,
             ]);
 
@@ -61,15 +59,64 @@ class ProfileTest extends TestCase
         $this->assertNotNull($user->refresh()->email_verified_at);
     }
 
+    public function test_avatar_color_can_be_updated(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name'         => $user->name,
+                'email'        => $user->email,
+                'avatar_color' => '#16a34a',
+            ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $this->assertSame('#16a34a', $user->refresh()->avatar_color);
+    }
+
+    public function test_theme_can_be_updated(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile/theme', ['theme' => 'dark']);
+
+        $response->assertSessionHasNoErrors()->assertRedirect();
+
+        $this->assertSame('dark', $user->refresh()->theme);
+    }
+
+    public function test_theme_update_rejects_invalid_value(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile/theme', ['theme' => 'invalid']);
+
+        $response->assertSessionHasErrors('theme');
+    }
+
+    public function test_theme_accepts_all_valid_values(): void
+    {
+        $user = User::factory()->create();
+
+        foreach (['light', 'dark', 'system'] as $theme) {
+            $this->actingAs($user)->patch('/profile/theme', ['theme' => $theme]);
+            $this->assertSame($theme, $user->refresh()->theme);
+        }
+    }
+
     public function test_user_can_delete_their_account(): void
     {
         $user = User::factory()->create();
 
         $response = $this
             ->actingAs($user)
-            ->delete('/profile', [
-                'password' => 'password',
-            ]);
+            ->delete('/profile', ['password' => 'password']);
 
         $response
             ->assertSessionHasNoErrors()
@@ -86,9 +133,7 @@ class ProfileTest extends TestCase
         $response = $this
             ->actingAs($user)
             ->from('/profile')
-            ->delete('/profile', [
-                'password' => 'wrong-password',
-            ]);
+            ->delete('/profile', ['password' => 'wrong-password']);
 
         $response
             ->assertSessionHasErrors('password')

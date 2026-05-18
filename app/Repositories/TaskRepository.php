@@ -12,6 +12,32 @@ class TaskRepository
         return $task;
     }
 
+    /**
+     * Replace the task's assignees with the given user IDs.
+     *
+     * Also mirrors the chosen "primary" assignee into the legacy
+     * `tasks.assignee_id` column so existing views and notifications keep
+     * working. The primary is the first id in the array (callers can sort).
+     *
+     * Returns the canonical list of user IDs now on the task.
+     *
+     * @param  array<int>  $userIds
+     * @return array<int>
+     */
+    public function syncAssignees(Task $task, array $userIds): array
+    {
+        $userIds = array_values(array_unique(array_map('intval', $userIds)));
+
+        $task->assignees()->sync($userIds);
+
+        $primary = $userIds[0] ?? null;
+        if ($task->assignee_id !== $primary) {
+            $task->update(['assignee_id' => $primary]);
+        }
+
+        return $userIds;
+    }
+
     public function createSubtask(Task $parent, array $data): Task
     {
         $project = $parent->project;

@@ -70,11 +70,11 @@
           <Avatar :name="user.name" :color="user.avatar_color || null" size="sm" />
           <div class="user-info">
             <div class="user-name">{{ user.name }}</div>
-            <div class="user-role">Owner</div>
+            <div class="user-role">{{ isOwner ? 'Owner' : 'Member' }}</div>
           </div>
         </div>
-        <button class="bell-btn" title="Settings" @click="showWorkspaceSettings = true">
-          <SettingsIcon style="width:14px;height:14px" />
+        <button class="logout-btn" title="Log out" @click="logout">
+          <LogoutIcon style="width:14px;height:14px" />
         </button>
       </div>
 
@@ -104,7 +104,7 @@ import WorkspaceSettingsModal from '@/Components/Modals/WorkspaceSettingsModal.v
 import { useToast } from '@/composables/useToast'
 import {
   ChevronIcon, HomeIcon, InboxIcon, UserIcon,
-  PlusIcon, HistoryIcon, SettingsIcon, UsersIcon,
+  PlusIcon, HistoryIcon, SettingsIcon, UsersIcon, LogoutIcon,
 } from '@/Components/UI/Icons.vue'
 
 const page = usePage()
@@ -133,6 +133,14 @@ function isProjectActive(id) {
 
 const inboxCount = computed(() => page.props.inbox_count ?? 0)
 const myTasksCount = computed(() => page.props.my_tasks_count ?? 0)
+
+const isOwner = computed(() =>
+  workspace.value && workspace.value.owner_id === user.value?.id
+)
+
+function logout() {
+  router.post(route('logout'))
+}
 </script>
 
 <style scoped>
@@ -279,14 +287,14 @@ const myTasksCount = computed(() => page.props.my_tasks_count ?? 0)
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-.bell-btn {
+.logout-btn {
   display: flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; flex-shrink: 0;
   border-radius: 5px; border: none; background: none;
   color: var(--fg-muted); cursor: pointer;
   transition: background 80ms, color 80ms;
 }
-.bell-btn:hover { background: var(--bg-hover); color: var(--fg); }
+.logout-btn:hover { background: var(--bg-hover); color: var(--fg); }
 
 /* Main */
 .main-area {

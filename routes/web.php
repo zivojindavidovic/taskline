@@ -4,6 +4,7 @@ use App\Http\Controllers\AuditController;
 use App\Http\Controllers\BoardColumnController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InboxController;
+use App\Http\Controllers\InvitationAcceptController;
 use App\Http\Controllers\MembersController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
@@ -18,6 +19,9 @@ use App\Http\Controllers\TaskController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('dashboard'));
+
+// Invitation accept (auth-optional — controller decides what to do for guests vs users)
+Route::get('/invitations/{token}', [InvitationAcceptController::class, 'show'])->name('invitations.accept');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -62,6 +66,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/tasks/{task}/uncomplete', [TaskController::class, 'uncomplete'])->name('tasks.uncomplete');
     Route::post('/tasks/{task}/subtasks', [TaskController::class, 'storeSubtask'])->name('tasks.subtasks.store');
     Route::patch('/tasks/{task}/subtasks/{subtask}', [TaskController::class, 'updateSubtask'])->name('tasks.subtasks.update');
+    Route::get('/tasks/{task}/participants', [TaskController::class, 'participants'])->name('tasks.participants');
     Route::post('/tasks/{task}/attachments', [TaskAttachmentController::class, 'store'])->name('tasks.attachments.store');
     Route::delete('/attachments/{attachment}', [TaskAttachmentController::class, 'destroy'])->name('attachments.destroy');
 
@@ -82,6 +87,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/profile/theme', [ProfileController::class, 'updateTheme'])->name('profile.theme');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 

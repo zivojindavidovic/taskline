@@ -53,4 +53,8 @@ export const DragIcon     = ic('<circle cx="6" cy="4" r=".8" fill="currentColor"
 export const UsersIcon     = ic('<circle cx="6" cy="5.5" r="2"/><path d="M2 13c.4-2 2-3.5 4-3.5s3.6 1.5 4 3.5"/><circle cx="11.5" cy="5" r="1.8"/><path d="M13.5 12.5c-.4-1.8-1.6-3-3-3h-.5"/>')
 export const PaperclipIcon = ic('<path d="M13 7.5 7.5 13A3.5 3.5 0 0 1 3 8.5L8 3.5A2 2 0 0 1 11 6l-5 5a.7.7 0 0 1-1-1l4-4"/>')
 export const DownloadIcon  = ic('<path d="M8 3v7M5 7l3 3 3-3"/><path d="M3 13h10"/>')
+export const LogoutIcon    = ic('<path d="M9.5 2.5H3a1 1 0 0 0-1 1V12.5a1 1 0 0 0 1 1H9.5M6.5 8H14M11 5L14 8L11 11"/>')
+export const SunIcon       = ic('<circle cx="8" cy="8" r="3"/><path d="M8 1v1.5M8 13.5V15M15 8h-1.5M2.5 8H1M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1M12.6 12.6l-1.1-1.1M4.5 4.5L3.4 3.4"/>')
+export const MoonIcon      = ic('<path d="M13.5 9.5A6 6 0 1 1 6.5 2.5a5 5 0 0 0 7 7z"/>')
+export const MonitorIcon   = ic('<path d="M2 2.5h12v8H2zM5.5 13.5h5M8 10.5v3"/>')
 </script>

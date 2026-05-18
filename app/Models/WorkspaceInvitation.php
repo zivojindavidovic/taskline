@@ -7,7 +7,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WorkspaceInvitation extends Model
 {
-    protected $fillable = ['workspace_id', 'email', 'role', 'invited_by'];
+    protected $fillable = ['workspace_id', 'email', 'role', 'invited_by', 'token', 'expires_at'];
+
+    protected $casts = [
+        'expires_at' => 'datetime',
+    ];
+
+    public function isExpired(): bool
+    {
+        return $this->expires_at !== null && $this->expires_at->isPast();
+    }
 
     public function workspace(): BelongsTo
     {

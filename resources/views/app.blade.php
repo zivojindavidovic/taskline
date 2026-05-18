@@ -6,6 +6,22 @@
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
+        <!-- Apply theme before paint to avoid flash -->
+        <script>
+        (function () {
+            @auth
+            var t = '{{ auth()->user()->theme ?? 'system' }}';
+            @else
+            var t = localStorage.getItem('theme') || 'system';
+            @endauth
+            if (t === 'dark') {
+                document.documentElement.dataset.theme = 'dark';
+            } else if (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.dataset.theme = 'dark';
+            }
+        })();
+        </script>
+
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -94,19 +94,24 @@ class ProjectController extends Controller
         $taskQuery = $project->tasks()
             ->whereNull('parent_task_id')
             ->with([
-                'assignee:id,name,email',
+                'assignee:id,name,email,avatar_color',
+                'assignees:id,name,email,avatar_color',
                 'boardColumn:id,name,color',
                 'sprint:id,name,status',
                 'comments' => fn ($q) => $q->oldest(),
-                'comments.user:id,name,email',
+                'comments.user:id,name,email,avatar_color',
                 'comments.replies' => fn ($q) => $q->oldest(),
-                'comments.replies.user:id,name,email',
+                'comments.replies.user:id,name,email,avatar_color',
                 'auditLogs' => fn ($q) => $q->oldest(),
-                'auditLogs.user:id,name',
-                'completedByUser:id,name',
-                'subtasks' => fn ($q) => $q->with(['assignee:id,name,email', 'boardColumn:id,name,color']),
+                'auditLogs.user:id,name,avatar_color',
+                'completedByUser:id,name,avatar_color',
+                'subtasks' => fn ($q) => $q->with([
+                    'assignee:id,name,email,avatar_color',
+                    'assignees:id,name,email,avatar_color',
+                    'boardColumn:id,name,color',
+                ]),
                 'attachments' => fn ($q) => $q->latest(),
-                'attachments.uploader:id,name',
+                'attachments.uploader:id,name,avatar_color',
             ]);
 
         if ($isAll) {
@@ -118,12 +123,17 @@ class ProjectController extends Controller
         }
 
         $workspace = $project->workspace;
-        $members = $workspace->users()->get(['users.id', 'users.name', 'users.email']);
+        $members = $workspace->users()->get(['users.id', 'users.name', 'users.email', 'users.avatar_color']);
         $owner = $workspace->owner;
         if (!$members->contains('id', $owner->id)) {
-            $members = collect([['id' => $owner->id, 'name' => $owner->name, 'email' => $owner->email]])->concat($members);
+            $members = collect([[
+                'id' => $owner->id,
+                'name' => $owner->name,
+                'email' => $owner->email,
+                'avatar_color' => $owner->avatar_color,
+            ]])->concat($members);
         }
-        $allUsers = $members->map(fn ($m) => is_array($m) ? $m : $m->only(['id', 'name', 'email']));
+        $allUsers = $members->map(fn ($m) => is_array($m) ? $m : $m->only(['id', 'name', 'email', 'avatar_color']));
 
         $allProjects = $workspace->projects()
             ->orderBy('name')

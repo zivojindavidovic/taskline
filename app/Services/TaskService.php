@@ -13,10 +13,25 @@ class TaskService
 
     public function update(Task $task, array $data, int $userId): Task
     {
-        $action = $this->resolveAuditAction($task, $data);
-        $meta   = $this->resolveAuditMeta($task, $data);
+        // Extract assignee_ids before passing the rest to the column update — the
+        // pivot is synced separately.
+        $assigneeIds = null;
+        if (array_key_exists('assignee_ids', $data)) {
+            $assigneeIds = $data['assignee_ids'] ?? [];
+            unset($data['assignee_ids']);
+        }
 
-        $this->repository->update($task, $data);
+        $action = $this->resolveAuditAction($task, $data, $assigneeIds);
+        $meta   = $this->resolveAuditMeta($task, $data, $assigneeIds);
+
+        if (!empty($data)) {
+            $this->repository->update($task, $data);
+        }
+
+        if ($assigneeIds !== null) {
+            $this->repository->syncAssignees($task, $assigneeIds);
+            $task->refresh();
+        }
 
         AuditLog::create([
             'user_id'    => $userId,
@@ -27,6 +42,30 @@ class TaskService
         ]);
 
         return $task;
+    }
+
+    /**
+     * Replace assignees on a task (idempotent).
+     *
+     * @param  array<int>  $userIds
+     */
+    public function setAssignees(Task $task, array $userIds, int $actingUserId): Task
+    {
+        $previous = $task->assignees()->pluck('users.id')->all();
+        $this->repository->syncAssignees($task, $userIds);
+
+        AuditLog::create([
+            'user_id'    => $actingUserId,
+            'project_id' => $task->project_id,
+            'task_id'    => $task->id,
+            'action'     => 'task.assigned',
+            'meta'       => [
+                'assignee_ids'          => $task->assignees()->pluck('users.id')->all(),
+                'previous_assignee_ids' => $previous,
+            ],
+        ]);
+
+        return $task->refresh();
     }
 
     public function createSubtask(Task $parent, string $title, ?string $priority, int $userId): Task
@@ -68,12 +107,12 @@ class TaskService
         $this->repository->delete($task);
     }
 
-    private function resolveAuditAction(Task $task, array $data): string
+    private function resolveAuditAction(Task $task, array $data, ?array $assigneeIds = null): string
     {
         if (isset($data['board_column_id']) && $data['board_column_id'] != $task->board_column_id) {
             return 'task.moved';
         }
-        if (array_key_exists('assignee_id', $data)) return 'task.assigned';
+        if (array_key_exists('assignee_id', $data) || $assigneeIds !== null) return 'task.assigned';
         if (isset($data['priority']))                return 'task.priority_changed';
         if (isset($data['title']))                   return 'task.renamed';
         if (isset($data['tags']))                    return 'task.tags_updated';
@@ -82,12 +121,13 @@ class TaskService
         return 'task.updated';
     }
 
-    private function resolveAuditMeta(Task $task, array $data): array
+    private function resolveAuditMeta(Task $task, array $data, ?array $assigneeIds = null): array
     {
         if (isset($data['board_column_id']) && $data['board_column_id'] != $task->board_column_id) {
             $col = BoardColumn::find($data['board_column_id']);
             return ['column' => $col?->name];
         }
+        if ($assigneeIds !== null) return ['assignee_ids' => array_values($assigneeIds)];
         if (isset($data['priority'])) return ['priority' => $data['priority']];
         if (isset($data['title']))    return ['title' => $data['title']];
         if (isset($data['tags']))     return ['tags' => $data['tags']];

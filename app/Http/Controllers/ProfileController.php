@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Services\ProfileService;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,9 +14,8 @@ use Inertia\Response;
 
 class ProfileController extends Controller
 {
-    /**
-     * Display the user's profile form.
-     */
+    public function __construct(private ProfileService $profileService) {}
+
     public function edit(Request $request): Response
     {
         return Inertia::render('Profile/Edit', [
@@ -24,25 +24,24 @@ class ProfileController extends Controller
         ]);
     }
 
-    /**
-     * Update the user's profile information.
-     */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
-
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
-        }
-
-        $request->user()->save();
+        $this->profileService->updateProfile($request->user(), $request->validated());
 
         return Redirect::route('profile.edit')->with('success', 'Profile updated.');
     }
 
-    /**
-     * Delete the user's account.
-     */
+    public function updateTheme(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'theme' => ['required', 'string', 'in:light,dark,system'],
+        ]);
+
+        $this->profileService->updateTheme($request->user(), $request->string('theme')->value());
+
+        return back();
+    }
+
     public function destroy(Request $request): RedirectResponse
     {
         $request->validate([
@@ -53,7 +52,7 @@ class ProfileController extends Controller
 
         Auth::logout();
 
-        $user->delete();
+        $this->profileService->deleteAccount($user);
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

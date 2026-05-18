@@ -2,15 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\InviteMemberRequest;
 use App\Models\User;
 use App\Models\WorkspaceInvitation;
+use App\Services\InvitationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class WorkspaceMembersController extends Controller
 {
+    public function __construct(private InvitationService $invitations) {}
+
     public function index(Request $request): Response
     {
         $user      = $request->user();
@@ -64,34 +69,17 @@ class WorkspaceMembersController extends Controller
         ]);
     }
 
-    public function invite(Request $request): RedirectResponse
+    public function invite(InviteMemberRequest $request): RedirectResponse
     {
         $user      = $request->user();
         $workspace = $user->currentWorkspace;
+        $data      = $request->validated();
 
-        abort_unless($workspace && $workspace->owner_id === $user->id, 403);
-
-        $data = $request->validate([
-            'email' => 'required|email',
-            'role'  => 'required|in:admin,member,viewer',
-        ]);
-
-        $existingUser = User::where('email', $data['email'])->first();
-        if ($existingUser && $workspace->users()->where('users.id', $existingUser->id)->exists()) {
-            return back()->withErrors(['email' => 'This user is already a member of the workspace.']);
+        try {
+            $this->invitations->invite($workspace, $data['email'], $data['role'], $user->id);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
         }
-
-        if (WorkspaceInvitation::where('workspace_id', $workspace->id)
-                ->where('email', $data['email'])->exists()) {
-            return back()->withErrors(['email' => 'An invitation has already been sent to this email.']);
-        }
-
-        WorkspaceInvitation::create([
-            'workspace_id' => $workspace->id,
-            'email'        => $data['email'],
-            'role'         => $data['role'],
-            'invited_by'   => $user->id,
-        ]);
 
         return back()->with('success', "Invitation sent to {$data['email']}.");
     }
@@ -103,9 +91,7 @@ class WorkspaceMembersController extends Controller
 
         abort_unless($workspace && $workspace->owner_id === $user->id, 403);
 
-        WorkspaceInvitation::where('id', $invitation)
-            ->where('workspace_id', $workspace->id)
-            ->delete();
+        $this->invitations->revoke($workspace, $invitation, $user->id);
 
         return back()->with('success', 'Invitation revoked.');
     }

@@ -92,14 +92,19 @@
             </DropdownMenu>
           </div>
 
-          <div class="key">Assignee</div>
+          <div class="key">Assignees</div>
           <div class="val">
             <DropdownMenu :width="220">
               <template #trigger>
                 <span class="prop-pill">
-                  <template v-if="task.assignee">
-                    <Avatar :name="task.assignee.name" size="sm" />
-                    <span>{{ task.assignee.name }}</span>
+                  <template v-if="currentAssignees.length">
+                    <span class="assignee-stack">
+                      <span v-for="u in currentAssignees.slice(0, 3)" :key="u.id" class="stack-item">
+                        <Avatar :name="u.name" size="sm" />
+                      </span>
+                      <span v-if="currentAssignees.length > 3" class="avatar-more">+{{ currentAssignees.length - 3 }}</span>
+                    </span>
+                    <span>{{ currentAssignees.length === 1 ? currentAssignees[0].name : `${currentAssignees.length} people` }}</span>
                   </template>
                   <template v-else>
                     <span class="avatar-empty">?</span>
@@ -109,8 +114,8 @@
               </template>
               <div>
                 <div class="menu-label">Assign to</div>
-                <MenuItem :disabled="locked" @click="!locked && $emit('update', { assignee_id: null })">
-                  <span class="check-slot"><CheckIcon v-if="!task.assignee_id" class="check" /></span>
+                <MenuItem :disabled="locked" data-keep-open @click="!locked && clearAssignees()">
+                  <span class="check-slot"><CheckIcon v-if="!localAssigneeIds.length" class="check" /></span>
                   Unassigned
                 </MenuItem>
                 <div class="menu-divider" />
@@ -118,9 +123,10 @@
                   v-for="u in allUsers"
                   :key="u.id"
                   :disabled="locked"
-                  @click="!locked && $emit('update', { assignee_id: u.id })"
+                  data-keep-open
+                  @click="!locked && toggleAssignee(u.id)"
                 >
-                  <span class="check-slot"><CheckIcon v-if="u.id === task.assignee_id" class="check" /></span>
+                  <span class="check-slot"><CheckIcon v-if="localAssigneeIds.includes(u.id)" class="check" /></span>
                   <Avatar :name="u.name" size="sm" />
                   <span>{{ u.name }}</span>
                 </MenuItem>
@@ -403,6 +409,55 @@
         @upload="file => emit('attachmentUpload', file)"
         @remove="id => emit('attachmentRemove', id)"
       />
+
+      <!-- Participants -->
+      <div class="panel-section">
+        <div class="section-head">
+          <div class="head-left">
+            <span class="panel-section-title">Participants</span>
+            <span v-if="participants.length" class="count-mono">{{ participants.length }}</span>
+          </div>
+          <button v-if="participants.length" type="button" class="btn ghost sm" @click="showParticipantsModal = true">View all</button>
+        </div>
+        <div v-if="participants.length" class="participants-row">
+          <button
+            v-for="p in participants.slice(0, 8)"
+            :key="p.id"
+            type="button"
+            class="participant-avatar-btn"
+            :title="p.name"
+            @click="showParticipantsModal = true"
+          >
+            <Avatar :name="p.name" size="sm" />
+          </button>
+          <span v-if="participants.length > 8" class="avatar-more">+{{ participants.length - 8 }}</span>
+        </div>
+        <p v-else class="muted small-pad">No participants yet.</p>
+      </div>
+
+      <Teleport to="body">
+        <template v-if="showParticipantsModal">
+          <div class="tp-modal-backdrop" @click="showParticipantsModal = false" />
+          <div class="tp-modal" role="dialog" aria-label="Participants">
+            <div class="tp-modal-header">
+              <span class="tp-modal-title">Participants</span>
+              <button type="button" class="btn ghost icon-only sm" @click="showParticipantsModal = false"><CloseIcon /></button>
+            </div>
+            <div class="tp-modal-body">
+              <p v-if="!participants.length" class="muted small-pad">No participants yet.</p>
+              <div v-for="p in participants" :key="p.id" class="participant-row-item">
+                <Avatar :name="p.name" size="md" />
+                <div class="participant-meta">
+                  <div class="participant-name">{{ p.name }}</div>
+                  <div class="participant-roles">
+                    <span v-for="role in p.roles" :key="role" :class="['role-chip', `role-${role}`]">{{ role }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </Teleport>
 
       <!-- Tabs: Comments / Activity -->
       <div class="panel-section">
@@ -710,13 +765,57 @@
             @blur="onSubtaskDescBlur"
           >{{ openSubtask.description || '' }}</div>
         </div>
+
+        <!-- Subtask Attachments -->
+        <AttachmentsSection
+          :attachments="openSubtaskAttachments"
+          :locked="locked"
+          @upload="onSubtaskAttachmentUpload"
+          @remove="onSubtaskAttachmentRemove"
+        />
+
+        <!-- Subtask Comments -->
+        <div class="panel-section">
+          <div class="panel-section-title">Comments</div>
+          <div class="vstack">
+            <p v-if="!openSubtaskComments.length" class="muted small-pad">No comments yet.</p>
+            <div v-for="c in openSubtaskComments" :key="c.id" class="comment">
+              <Avatar :name="c.author ?? c.user?.name" size="sm" />
+              <div class="body">
+                <div class="author-row">
+                  <span class="author">{{ c.author ?? c.user?.name }}</span>
+                  <span class="time">{{ c.time ?? formatAgo(c.created_at) }}</span>
+                </div>
+                <div class="text">{{ c.body }}</div>
+              </div>
+            </div>
+            <div v-if="!locked" class="composer">
+              <Avatar :name="currentUser?.name" size="sm" />
+              <div class="body">
+                <textarea
+                  v-model="subtaskNewComment"
+                  class="input textarea"
+                  placeholder="Add a comment…"
+                />
+                <div class="hstack-end">
+                  <button
+                    type="button"
+                    class="btn primary sm"
+                    :disabled="!subtaskNewComment.trim()"
+                    @click="submitSubtaskComment"
+                  >Comment</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </template>
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, reactive, watch, nextTick } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import Avatar from '@/Components/UI/Avatar.vue'
 import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
@@ -816,6 +915,91 @@ function toggleTag(tag) {
 
 const subtaskTagSearch = ref('')
 const subtaskDescEl   = ref(null)
+
+// Multi-assignee
+const localAssigneeIds = ref(
+  props.task.assignees?.map(u => u.id) ?? (props.task.assignee_id ? [props.task.assignee_id] : [])
+)
+watch(() => props.task, t => {
+  localAssigneeIds.value = t.assignees?.map(u => u.id) ?? (t.assignee_id ? [t.assignee_id] : [])
+})
+const currentAssignees = computed(() =>
+  localAssigneeIds.value.map(id => props.allUsers.find(u => u.id === id)).filter(Boolean)
+)
+function toggleAssignee(id) {
+  const idx = localAssigneeIds.value.indexOf(id)
+  if (idx === -1) localAssigneeIds.value = [...localAssigneeIds.value, id]
+  else localAssigneeIds.value = localAssigneeIds.value.filter(i => i !== id)
+  emit('update', { assignee_ids: localAssigneeIds.value })
+}
+function clearAssignees() {
+  localAssigneeIds.value = []
+  emit('update', { assignee_ids: [] })
+}
+
+// Participants — canonical list comes from the server (/tasks/{id}/participants)
+const showParticipantsModal = ref(false)
+const participants = ref([])
+async function loadParticipants() {
+  if (!props.task?.id) { participants.value = []; return }
+  try {
+    const res = await fetch(route('tasks.participants', props.task.id), {
+      headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin',
+    })
+    if (!res.ok) { participants.value = []; return }
+    participants.value = await res.json()
+  } catch {
+    participants.value = []
+  }
+}
+loadParticipants()
+watch(() => props.task?.id, loadParticipants)
+watch(() => [
+  props.task?.assignees?.length,
+  props.task?.assignee_id,
+  props.task?.comments?.length,
+  props.task?.audit_logs?.length,
+  props.task?.completed_by,
+], () => loadParticipants())
+
+// Subtask local state (attachments + comments — stored in-memory, not persisted)
+const subtaskLocalData = reactive({})
+function getSubtaskData(id) {
+  if (!subtaskLocalData[id]) subtaskLocalData[id] = { attachments: [], comments: [] }
+  return subtaskLocalData[id]
+}
+const openSubtaskAttachments = computed(() => {
+  if (!openSubtask.value) return []
+  const local = subtaskLocalData[openSubtask.value.id]?.attachments ?? []
+  return [...(openSubtask.value.attachments ?? []), ...local]
+})
+const openSubtaskComments = computed(() => {
+  if (!openSubtask.value) return []
+  const local = subtaskLocalData[openSubtask.value.id]?.comments ?? []
+  return [...(openSubtask.value.comments ?? []), ...local]
+})
+const subtaskNewComment = ref('')
+function onSubtaskAttachmentUpload(file) {
+  if (!openSubtask.value) return
+  getSubtaskData(openSubtask.value.id).attachments.push({
+    id: Date.now(), name: file.name, size: file.size,
+    url: URL.createObjectURL(file),
+  })
+}
+function onSubtaskAttachmentRemove(id) {
+  if (!openSubtask.value) return
+  const data = getSubtaskData(openSubtask.value.id)
+  data.attachments = data.attachments.filter(a => a.id !== id)
+}
+function submitSubtaskComment() {
+  const body = subtaskNewComment.value.trim()
+  if (!body || !openSubtask.value) return
+  getSubtaskData(openSubtask.value.id).comments.push({
+    id: Date.now(), author: currentUser.value?.name ?? 'Me', body, time: 'just now',
+  })
+  subtaskNewComment.value = ''
+}
 
 const subtaskAllTagOptions = computed(() => {
   const extra = openSubtask.value?.tags ?? []
@@ -1347,5 +1531,82 @@ input[type="date"].input { padding: 0 8px; height: 28px; font-size: 13px; }
   border: 1px solid var(--border);
   background: var(--bg-sunken);
   color: var(--fg-muted);
+}
+
+/* ===== Multi-assignee stack ===== */
+.assignee-stack { display: inline-flex; align-items: center; }
+.stack-item + .stack-item { margin-left: -6px; }
+.stack-item :deep(div) { box-shadow: 0 0 0 2px var(--bg-panel); border-radius: 50%; }
+.avatar-more {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--bg-active); color: var(--fg-muted);
+  font-size: 10px; font-weight: 600;
+  box-shadow: 0 0 0 2px var(--bg-panel);
+  margin-left: -6px;
+}
+
+/* ===== Participants ===== */
+.participants-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.participant-avatar-btn {
+  background: none; border: none; padding: 0; cursor: pointer;
+  display: inline-flex; border-radius: 50%;
+}
+.participant-avatar-btn:hover :deep(div) { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Participants modal */
+.tp-modal-backdrop {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0, 0, 0, 0.25);
+}
+.tp-modal {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 201;
+  width: 360px; max-width: 92vw;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column;
+  max-height: 80vh;
+}
+.tp-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tp-modal-title { font-weight: 600; font-size: 15px; }
+.tp-modal-body { overflow-y: auto; padding: 8px 16px 16px; }
+.participant-row-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.participant-row-item:last-child { border-bottom: none; }
+.participant-meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.participant-name { font-size: 13px; font-weight: 500; }
+.participant-roles { display: flex; gap: 4px; flex-wrap: wrap; }
+.role-chip {
+  font-size: 11px; padding: 1px 6px;
+  border-radius: 3px; font-weight: 500;
+  background: var(--bg-sunken); color: var(--fg-muted);
+  border: 1px solid var(--border);
+}
+.role-chip.role-assignee {
+  background: color-mix(in oklab, var(--accent) 12%, var(--bg-panel));
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
+}
+.role-chip.role-commenter {
+  background: color-mix(in oklab, var(--status-progress) 12%, var(--bg-panel));
+  color: var(--status-progress);
+  border-color: color-mix(in oklab, var(--status-progress) 30%, var(--border));
+}
+.role-chip.role-reporter {
+  background: color-mix(in oklab, var(--status-done) 12%, var(--bg-panel));
+  color: var(--status-done);
+  border-color: color-mix(in oklab, var(--status-done) 30%, var(--border));
 }
 </style>
