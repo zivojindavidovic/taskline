@@ -37,6 +37,8 @@ class FilterController extends Controller
             'statuses.*'     => ['string', 'in:open,completed'],
             'hide_completed' => ['nullable', 'boolean'],
             'unassigned'     => ['nullable', 'boolean'],
+            'view_mode'      => ['nullable', 'string', 'in:active,backlog,all'],
+            'view_sprint_id' => ['nullable', 'integer', 'exists:sprints,id'],
         ]);
 
         $filter = $this->service->save(auth()->id(), $project->id, $validated);
@@ -49,6 +51,8 @@ class FilterController extends Controller
             'statuses'       => $filter->statuses       ?? [],
             'hide_completed' => $filter->hide_completed ?? false,
             'unassigned'     => $filter->unassigned     ?? false,
+            'view_mode'      => $filter->view_mode      ?? 'active',
+            'view_sprint_id' => $filter->view_sprint_id,
         ]);
     }
 

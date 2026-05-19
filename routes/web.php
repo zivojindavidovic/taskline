@@ -80,6 +80,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/projects/{project}/sprints', [SprintController::class, 'store'])->name('sprints.store');
     Route::post('/sprints/{sprint}/lock', [SprintController::class, 'lock'])->name('sprints.lock');
     Route::post('/sprints/{sprint}/unlock', [SprintController::class, 'unlock'])->name('sprints.unlock');
+    Route::post('/sprints/{sprint}/complete', [SprintController::class, 'complete'])->name('sprints.complete');
+    Route::post('/sprints/{sprint}/reopen', [SprintController::class, 'reopen'])->name('sprints.reopen');
 
     // Board columns
     Route::post('/projects/{project}/columns', [BoardColumnController::class, 'store'])->name('columns.store');

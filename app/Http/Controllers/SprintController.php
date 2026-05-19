@@ -53,4 +53,36 @@ class SprintController extends Controller
 
         return back()->with('success', "{$sprint->name} unlocked.");
     }
+
+    public function complete(Sprint $sprint): RedirectResponse
+    {
+        abort_if($sprint->status === 'completed', 422, 'Sprint is already completed.');
+
+        $sprint->update(['status' => 'completed']);
+
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'project_id' => $sprint->project_id,
+            'action'     => 'sprint.completed',
+            'meta'       => ['sprint' => $sprint->name],
+        ]);
+
+        return back()->with('success', "{$sprint->name} completed.");
+    }
+
+    public function reopen(Sprint $sprint): RedirectResponse
+    {
+        abort_if($sprint->status !== 'completed', 422, 'Sprint is not completed.');
+
+        $sprint->update(['status' => 'active']);
+
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'project_id' => $sprint->project_id,
+            'action'     => 'sprint.reopened',
+            'meta'       => ['sprint' => $sprint->name],
+        ]);
+
+        return back()->with('success', "{$sprint->name} reopened.");
+    }
 }

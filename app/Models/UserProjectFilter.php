@@ -17,6 +17,8 @@ class UserProjectFilter extends Model
         'statuses',
         'hide_completed',
         'unassigned',
+        'view_mode',
+        'view_sprint_id',
     ];
 
     protected $casts = [
@@ -28,6 +30,8 @@ class UserProjectFilter extends Model
         'hide_completed' => 'boolean',
         'unassigned'     => 'boolean',
     ];
+
+    public const VIEW_MODES = ['active', 'backlog', 'all'];
 
     public function user(): BelongsTo
     {

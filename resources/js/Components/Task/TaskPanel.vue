@@ -47,7 +47,7 @@
       >{{ task.title }}</div>
 
       <!-- Not completed yet banner -->
-      <div v-if="!task.completed && !locked" class="banner banner-done">
+      <div v-if="!task.completed" class="banner banner-done">
         <CheckIcon class="icon-done" />
         <span class="text" style="color: var(--status-done); font-weight: 500;">This task is not completed yet</span>
         <button type="button" class="btn primary sm" @click="$emit('complete')">Mark as completed</button>
@@ -60,7 +60,7 @@
           Completed by <strong>{{ task.completed_by_user?.name ?? '—' }}</strong>
           <template v-if="completedAgo"> {{ completedAgo }}</template>.
         </span>
-        <button v-if="!locked" type="button" class="btn secondary sm" @click="$emit('uncomplete')">
+        <button type="button" class="btn secondary sm" @click="$emit('uncomplete')">
           Reopen
         </button>
       </div>

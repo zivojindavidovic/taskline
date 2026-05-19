@@ -74,22 +74,51 @@ class ProjectController extends Controller
             403
         );
 
-        $sprintId  = $request->query('sprint');
-        $isBacklog = $request->query('backlog') === '1';
-        $isAll     = $request->query('all') === '1';
+        $savedFilters = $this->filterService->get($user->id, $project->id);
+
+        $hasViewQuery = $request->has('sprint') || $request->has('backlog') || $request->has('all');
+
+        if ($hasViewQuery) {
+            $sprintId  = $request->query('sprint');
+            $isBacklog = $request->query('backlog') === '1';
+            $isAll     = $request->query('all') === '1';
+        } else {
+            // No explicit view in the URL → restore the last view this user
+            // selected for this project (sprint / backlog / all).
+            $isBacklog = ($savedFilters['view_mode'] ?? null) === 'backlog';
+            $isAll     = ($savedFilters['view_mode'] ?? null) === 'all';
+            $sprintId  = (!$isBacklog && !$isAll) ? ($savedFilters['view_sprint_id'] ?? null) : null;
+        }
 
         $sprint = null;
         if (!$isBacklog && !$isAll) {
             $sprint = $sprintId
-                ? $project->sprints()->findOrFail($sprintId)
-                : $project->sprints()->where('status', 'active')->first()
+                ? $project->sprints()->find($sprintId)
+                : null;
+            if (!$sprint) {
+                // Stored sprint was deleted, or no preference yet — fall back
+                // to active, then latest.
+                $sprint = $project->sprints()->where('status', 'active')->first()
                     ?? $project->sprints()->latest()->first();
+            }
+        }
+
+        // Persist whichever view we are about to render so refresh / logout
+        // restore the same selection. Skip if the project has no sprints AND
+        // we're trying to save an active-sprint view with no sprint id.
+        $viewMode = $isAll ? 'all' : ($isBacklog ? 'backlog' : 'active');
+        $viewSprintId = $viewMode === 'active' ? ($sprint?->id) : null;
+        if (
+            ($savedFilters['view_mode'] ?? null) !== $viewMode ||
+            ($savedFilters['view_sprint_id'] ?? null) !== $viewSprintId
+        ) {
+            $this->filterService->saveView($user->id, $project->id, $viewMode, $viewSprintId);
+            $savedFilters['view_mode'] = $viewMode;
+            $savedFilters['view_sprint_id'] = $viewSprintId;
         }
 
         $columns = $project->boardColumns()->orderBy('position')->get();
         $sprints = $project->sprints()->withCount('tasks')->orderByDesc('created_at')->get();
-
-        $savedFilters = $this->filterService->get($user->id, $project->id);
 
         $taskQuery = $project->tasks()
             ->whereNull('parent_task_id')

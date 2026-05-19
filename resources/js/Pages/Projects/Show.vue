@@ -190,17 +190,36 @@
         ><ListIcon style="width:14px;height:14px" /> List</button>
       </div>
 
-      <!-- Lock / Unlock sprint -->
-      <template v-if="currentSprint && !currentSprint.locked">
+      <!-- Lock / Unlock sprint (hidden once sprint is completed) -->
+      <template v-if="currentSprint && !isAll && !isBacklog && currentSprint.status !== 'completed' && !currentSprint.locked">
         <button type="button" class="btn-secondary" @click="showLockModal = true">
           <LockIcon style="width:14px;height:14px" /> Lock sprint
         </button>
       </template>
-      <template v-else-if="currentSprint?.locked">
+      <template v-else-if="currentSprint && !isAll && !isBacklog && currentSprint.status !== 'completed' && currentSprint.locked">
         <button type="button" class="btn-secondary" @click="unlockSprint">
           <LockIcon style="width:14px;height:14px" /> Unlock
         </button>
       </template>
+
+      <!-- Complete / Reopen sprint -->
+      <button
+        v-if="currentSprint && !isAll && !isBacklog && currentSprint.status !== 'completed'"
+        type="button"
+        class="btn-primary"
+        title="Mark this sprint as completed"
+        @click="completeSprint"
+      >
+        <CheckIcon style="width:14px;height:14px" /> Complete sprint
+      </button>
+      <button
+        v-else-if="currentSprint && !isAll && !isBacklog && currentSprint.status === 'completed'"
+        type="button"
+        class="btn-secondary"
+        @click="reopenSprint"
+      >
+        <LightningIcon style="width:14px;height:14px" /> Reopen sprint
+      </button>
     </div>
 
     <!-- Locked banner -->
@@ -678,6 +697,20 @@ function unlockSprint() {
   router.post(route('sprints.unlock', props.currentSprint.id), {}, { preserveScroll: true })
 }
 
+function completeSprint() {
+  router.post(route('sprints.complete', props.currentSprint.id), {}, {
+    preserveScroll: true,
+    onSuccess: () => toast(`${props.currentSprint.name} marked complete`),
+  })
+}
+
+function reopenSprint() {
+  router.post(route('sprints.reopen', props.currentSprint.id), {}, {
+    preserveScroll: true,
+    onSuccess: () => toast(`${props.currentSprint.name} reopened`),
+  })
+}
+
 function moveTask(taskId, columnId) {
   // Optimistic: update local copy immediately so board doesn't blink
   const prevColumnId = localTasks.value.find(t => t.id === taskId)?.board_column_id
@@ -859,6 +892,26 @@ function deleteColumn(columnId) {
   flex-shrink: 0;
 }
 .btn-secondary:hover { background: var(--bg-hover); }
+
+/* Primary topbar action (Complete sprint) */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  white-space: nowrap;
+  transition: background 80ms;
+  flex-shrink: 0;
+}
+.btn-primary:hover { background: var(--accent-hover); }
 
 .kbd-chip {
   font-family: var(--font-mono);
