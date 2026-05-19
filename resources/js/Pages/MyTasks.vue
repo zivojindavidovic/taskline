@@ -62,8 +62,8 @@
               <span
                 v-if="task.due_date"
                 class="shrink-0 text-xs"
-                :style="isOverdue(task) ? 'color:var(--status-warn-fg)' : 'color:var(--fg-muted)'"
-              >{{ formatDate(task.due_date) }}</span>
+                :style="dueLabelFor(task).urgent ? 'color:var(--status-blocked);font-weight:500' : 'color:var(--fg-muted)'"
+              >{{ dueLabelFor(task).label }}</span>
             </div>
           </div>
         </div>
@@ -82,6 +82,7 @@ import { router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
 import { CheckIcon } from '@/Components/UI/Icons.vue'
+import { formatDueDate } from '@/utils/dueDate'
 
 const props = defineProps({
   tasks: { type: Array, default: () => [] },
@@ -120,11 +121,7 @@ function toggleComplete(task) {
   }
 }
 
-function formatDate(d) {
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function isOverdue(task) {
-  return !task.completed && task.due_date && new Date(task.due_date) < new Date()
+function dueLabelFor(task) {
+  return formatDueDate(task.due_date, task.start_date, task.completed)
 }
 </script>

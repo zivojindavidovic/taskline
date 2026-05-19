@@ -6,7 +6,7 @@
       <div class="page-header">
         <div class="page-header-row">
           <h2 class="page-title">Members</h2>
-          <span class="page-meta">{{ members.length }} member{{ members.length !== 1 ? 's' : '' }} · {{ pending.length }} pending</span>
+          <span class="page-meta">{{ localMembers.length }} member{{ localMembers.length !== 1 ? 's' : '' }} · {{ localPending.length }} pending</span>
         </div>
         <p class="page-desc">Manage who has access to <strong>{{ workspace?.name }}</strong>.</p>
       </div>
@@ -30,6 +30,13 @@
             <option value="member">Member</option>
             <option value="viewer">Viewer</option>
           </select>
+          <div class="invite-access">
+            <ProjectAccessControl
+              v-model="inviteForm.projects"
+              :projects="projects"
+              aria-label="Project access for new invite"
+            />
+          </div>
           <button type="submit" class="btn-send-invite" :disabled="inviteForm.processing">
             <svg v-if="inviteForm.processing" class="spinner" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
@@ -37,6 +44,9 @@
             {{ inviteForm.processing ? 'Sending…' : 'Send invite' }}
           </button>
         </form>
+        <div class="invite-hint">
+          Choose which projects this teammate can see. You can change access at any time.
+        </div>
       </div>
 
       <!-- Current members -->
@@ -46,7 +56,7 @@
           <span class="title">Current members</span>
         </div>
 
-        <div v-for="m in members" :key="m.id" class="task-row member-row">
+        <div v-for="m in localMembers" :key="m.id" class="task-row member-row">
           <Avatar :name="m.name" size="md" />
 
           <div class="member-info">
@@ -57,6 +67,14 @@
           </div>
 
           <div class="member-right">
+            <ProjectAccessControl
+              :model-value="m.projectAccess"
+              :projects="projects"
+              :locked="m.role === 'owner' || !isOwner"
+              :aria-label="`Project access for ${m.name}`"
+              @change="(ids) => updateMemberAccess(m, ids)"
+            />
+
             <span class="joined-date">Joined {{ m.joined }}</span>
 
             <!-- Own row or owner: static badge -->
@@ -104,14 +122,14 @@
       </div>
 
       <!-- Pending invitations -->
-      <div v-if="pending.length > 0" class="list-card">
+      <div v-if="localPending.length > 0" class="list-card">
         <div class="head">
           <InboxIcon class="head-icon" />
           <span class="title">Pending invitations</span>
-          <span class="head-meta">{{ pending.length }} awaiting acceptance</span>
+          <span class="head-meta">{{ localPending.length }} awaiting acceptance</span>
         </div>
 
-        <div v-for="p in pending" :key="p.id" class="task-row pending-row">
+        <div v-for="p in localPending" :key="p.id" class="task-row pending-row">
           <div class="pending-avatar">?</div>
 
           <div class="pending-info">
@@ -119,9 +137,17 @@
             <div class="pending-sent">Sent {{ p.sent }}</div>
           </div>
 
+          <ProjectAccessControl
+            :model-value="p.projectAccess"
+            :projects="projects"
+            :locked="!isOwner"
+            :aria-label="`Project access for ${p.email}`"
+            @change="(ids) => updatePendingAccess(p, ids)"
+          />
+
           <RoleBadge :role="p.role" />
 
-          <button type="button" class="revoke-btn" @click="revokeInvite(p)">
+          <button v-if="isOwner" type="button" class="revoke-btn" @click="revokeInvite(p)">
             Revoke
           </button>
         </div>
@@ -132,12 +158,13 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h } from 'vue'
+import { computed, defineComponent, h, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { usePage, useForm, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Avatar from '@/Components/UI/Avatar.vue'
 import DropdownMenu from '@/Components/UI/DropdownMenu.vue'
 import MenuItem from '@/Components/UI/MenuItem.vue'
+import ProjectAccessControl from '@/Components/UI/ProjectAccessControl.vue'
 import { UsersIcon, InboxIcon, CheckIcon } from '@/Components/UI/Icons.vue'
 
 const ROLE_STYLES = {
@@ -152,7 +179,8 @@ const RoleBadge = defineComponent({
   props: { role: { type: String, required: true } },
   setup(props) {
     return () => {
-      const s = ROLE_STYLES[props.role] ?? ROLE_STYLES.member
+      const key = String(props.role).toLowerCase()
+      const s   = ROLE_STYLES[key] ?? ROLE_STYLES.member
       return h('span', {
         style: {
           fontSize: '11px',
@@ -164,7 +192,7 @@ const RoleBadge = defineComponent({
           letterSpacing: '0.02em',
           whiteSpace: 'nowrap',
         },
-      }, props.role.charAt(0).toUpperCase() + props.role.slice(1))
+      }, key.charAt(0).toUpperCase() + key.slice(1))
     }
   },
 })
@@ -172,6 +200,7 @@ const RoleBadge = defineComponent({
 const props = defineProps({
   members:    { type: Array,   default: () => [] },
   pending:    { type: Array,   default: () => [] },
+  projects:   { type: Array,   default: () => [] },
   isOwner:    { type: Boolean, default: false },
   authUserId: { type: Number,  default: null },
 })
@@ -179,11 +208,52 @@ const props = defineProps({
 const page      = usePage()
 const workspace = computed(() => page.props.workspace)
 
-const inviteForm = useForm({ email: '', role: 'member' })
+const allProjectIds = computed(() => props.projects.map(p => p.id))
+
+// Local mirrors so realtime events can mutate them without an Inertia refresh.
+const localMembers = ref(props.members.map(m => ({ ...m, projectAccess: [...(m.projectAccess ?? [])] })))
+const localPending = ref(props.pending.map(p => ({ ...p, projectAccess: [...(p.projectAccess ?? [])] })))
+
+watch(() => props.members, (next) => {
+  localMembers.value = next.map(m => ({ ...m, projectAccess: [...(m.projectAccess ?? [])] }))
+}, { deep: true })
+
+watch(() => props.pending, (next) => {
+  localPending.value = next.map(p => ({ ...p, projectAccess: [...(p.projectAccess ?? [])] }))
+}, { deep: true })
+
+// Realtime: listen for project-access changes from other admins on this workspace.
+let workspaceChannel = null
+onMounted(() => {
+  const id = workspace.value?.id
+  if (!id || !window.Echo) return
+
+  workspaceChannel = window.Echo.private(`workspace.${id}`)
+    .listen('MemberProjectAccessUpdated', ({ member_id, project_access }) => {
+      const row = localMembers.value.find(m => m.id === member_id)
+      if (row) row.projectAccess = Array.isArray(project_access) ? [...project_access] : []
+    })
+    .listen('InvitationProjectAccessUpdated', ({ invitation_id, project_access }) => {
+      const row = localPending.value.find(p => p.id === invitation_id)
+      if (row) row.projectAccess = Array.isArray(project_access) ? [...project_access] : []
+    })
+})
+
+onBeforeUnmount(() => {
+  const id = workspace.value?.id
+  if (id && window.Echo) window.Echo.leave(`workspace.${id}`)
+  workspaceChannel = null
+})
+
+const inviteForm = useForm({
+  email:    '',
+  role:     'member',
+  projects: [...allProjectIds.value],
+})
 
 function submitInvite() {
   inviteForm.post(route('settings.members.invite'), {
-    onSuccess: () => inviteForm.reset(),
+    onSuccess: () => inviteForm.reset('email', 'role').setData('projects', [...allProjectIds.value]),
     preserveScroll: true,
   })
 }
@@ -208,6 +278,23 @@ function revokeInvite(invitation) {
   router.delete(
     route('settings.members.revoke', invitation.id),
     { preserveScroll: true }
+  )
+}
+
+function updateMemberAccess(member, projectIds) {
+  if (member.role === 'owner') return
+  router.patch(
+    route('settings.members.projects', member.id),
+    { projects: projectIds },
+    { preserveScroll: true, preserveState: true }
+  )
+}
+
+function updatePendingAccess(invite, projectIds) {
+  router.patch(
+    route('settings.members.invitations.projects', invite.id),
+    { projects: projectIds },
+    { preserveScroll: true, preserveState: true }
   )
 }
 
@@ -278,6 +365,16 @@ function revokeInvite(invitation) {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.invite-access {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+}
+.invite-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--fg-subtle);
 }
 
 .field-input {
@@ -377,7 +474,7 @@ function revokeInvite(invitation) {
 .member-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
 }
 .joined-date {

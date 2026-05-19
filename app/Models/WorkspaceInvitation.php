@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WorkspaceInvitation extends Model
 {
-    protected $fillable = ['workspace_id', 'email', 'role', 'invited_by', 'token', 'expires_at'];
+    protected $fillable = ['workspace_id', 'email', 'role', 'projects', 'invited_by', 'token', 'expires_at'];
 
     protected $casts = [
         'expires_at' => 'datetime',
+        'projects'   => 'array',
     ];
 
     public function isExpired(): bool

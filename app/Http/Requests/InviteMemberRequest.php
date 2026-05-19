@@ -17,8 +17,10 @@ class InviteMemberRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => 'required|email|max:255',
-            'role'  => 'required|in:admin,member,viewer',
+            'email'      => 'required|email|max:255',
+            'role'       => 'required|in:admin,member,viewer',
+            'projects'   => 'sometimes|array',
+            'projects.*' => 'integer',
         ];
     }
 }

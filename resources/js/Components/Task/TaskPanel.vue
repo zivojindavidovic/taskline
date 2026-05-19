@@ -356,7 +356,11 @@
               @click="openSubtaskId = sub.id"
             >{{ sub.title }}</span>
             <div class="subtask-chips">
-              <span v-if="sub.due_date" class="subtask-due">{{ formatDateShort(sub.due_date) }}</span>
+              <span
+                v-if="sub.due_date"
+                class="subtask-due"
+                :class="{ urgent: subDueInfo(sub).urgent }"
+              >{{ subDueInfo(sub).label }}</span>
               <span
                 v-if="sub.priority && sub.priority !== 'med'"
                 class="subtask-prio"
@@ -853,6 +857,7 @@ import {
   LockIcon, CheckIcon, MoreIcon, CopyIcon, LinkIcon, TrashIcon,
   CloseIcon, LightningIcon, SendIcon, CalendarIcon, PlusIcon,
 } from '@/Components/UI/Icons.vue'
+import { formatDueDate } from '@/utils/dueDate'
 
 const props = defineProps({
   task:        { type: Object,  required: true },
@@ -885,9 +890,8 @@ const PRIORITY_COLORS = {
   low:    '#6b7280',
 }
 function priorityColor(id) { return PRIORITY_COLORS[id] || PRIORITY_COLORS.med }
-function formatDateShort(d) {
-  if (!d) return ''
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+function subDueInfo(sub) {
+  return formatDueDate(sub.due_date, null, sub.completed)
 }
 
 const page = usePage()
@@ -1402,6 +1406,9 @@ function copyLink() { navigator.clipboard?.writeText(window.location.href) }
 .subtask-due {
   font-size: 11px; font-family: var(--font-mono);
   color: var(--fg-subtle); white-space: nowrap;
+}
+.subtask-due.urgent {
+  color: var(--status-blocked); font-weight: 500;
 }
 .subtask-prio {
   width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0;

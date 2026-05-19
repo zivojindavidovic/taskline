@@ -27,7 +27,7 @@ class InvitationService
      *
      * @throws ValidationException when the email already belongs to a member or has a pending invite.
      */
-    public function invite(Workspace $workspace, string $email, string $role, int $inviterId): WorkspaceInvitation
+    public function invite(Workspace $workspace, string $email, string $role, int $inviterId, ?array $projectIds = null): WorkspaceInvitation
     {
         $email = strtolower(trim($email));
 
@@ -54,6 +54,7 @@ class InvitationService
             'workspace_id' => $workspace->id,
             'email'        => $email,
             'role'         => $role,
+            'projects'     => $projectIds,
             'invited_by'   => $inviterId,
             'token'        => $this->generateUniqueToken(),
             'expires_at'   => Carbon::now()->addDays(self::EXPIRES_IN_DAYS),
@@ -114,7 +115,19 @@ class InvitationService
         // Without these rows, Project::members() doesn't see the invitee and they
         // can't open any project in the workspace they just joined.
         $projectRole = $invitation->role === 'admin' ? 'admin' : 'member';
-        $projectIds = $workspace->projects()->pluck('id');
+
+        // null = legacy invite (created before per-project access existed) → grant all.
+        // An empty array is explicit "no access" and is honored.
+        $allIds = $workspace->projects()->pluck('id')->all();
+        if ($invitation->projects === null) {
+            $projectIds = $allIds;
+        } else {
+            $projectIds = array_values(array_intersect(
+                array_map('intval', $invitation->projects),
+                $allIds,
+            ));
+        }
+
         foreach ($projectIds as $projectId) {
             DB::table('workspace_members')->updateOrInsert(
                 ['project_id' => $projectId, 'user_id' => $user->id],

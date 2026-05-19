@@ -22,9 +22,9 @@
 
     <!-- Meta row -->
     <div class="card-meta">
-      <span v-if="task.due_date" :class="['chip', isDeadlineUrgent ? 'urgent' : '']">
+      <span v-if="task.due_date" :class="['chip', dueInfo.urgent ? 'urgent' : '']">
         <CalendarIcon class="w-4 h-4" />
-        {{ dueDateLabel }}
+        {{ dueInfo.label }}
       </span>
       <span v-if="task.comments?.length" class="chip">
         <CommentIcon class="w-4 h-4" />{{ task.comments.length }}
@@ -52,6 +52,7 @@ import { computed } from 'vue'
 import Avatar from '@/Components/UI/Avatar.vue'
 import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
 import { CalendarIcon, CommentIcon } from '@/Components/UI/Icons.vue'
+import { formatDueDate } from '@/utils/dueDate'
 
 const props = defineProps({
   task:     { type: Object, required: true },
@@ -64,37 +65,11 @@ function onDragStart(e) {
   emit('dragStart', props.task.id)
 }
 
-function fmtD(d) {
-  if (!d) return ''
-  const date = new Date(d)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-// Deadline urgency
 const subtasksDone = computed(() => props.task.subtasks?.filter(s => s.completed).length ?? 0)
 
-const deadlineDiff = computed(() => {
-  if (!props.task.due_date) return null
-  const due = new Date(props.task.due_date)
-  due.setHours(23, 59, 59, 999)
-  return Math.ceil((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-})
-
-const isDeadlineUrgent = computed(() =>
-  !props.task.completed && deadlineDiff.value !== null && deadlineDiff.value <= 1
+const dueInfo = computed(() =>
+  formatDueDate(props.task.due_date, props.task.start_date, props.task.completed)
 )
-
-const dueDateLabel = computed(() => {
-  const { start_date, due_date } = props.task
-  if (!due_date) return ''
-  if (start_date && start_date !== due_date) return `${fmtD(start_date)}–${fmtD(due_date)}`
-  const d = deadlineDiff.value
-  if (props.task.completed || d === null) return fmtD(due_date)
-  if (d < 0) return Math.abs(d) === 1 ? '1 day overdue' : `${Math.abs(d)} days overdue`
-  if (d === 0) return 'today'
-  if (d === 1) return 'tomorrow'
-  return fmtD(due_date)
-})
 
 </script>
 

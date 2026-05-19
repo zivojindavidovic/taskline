@@ -36,7 +36,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/settings/workspace', [SettingsController::class, 'destroyWorkspace'])->name('settings.workspace.destroy');
     Route::post('/settings/members/invite', [WorkspaceMembersController::class, 'invite'])->name('settings.members.invite');
     Route::patch('/settings/members/{member}/role', [WorkspaceMembersController::class, 'updateRole'])->name('settings.members.role');
+    Route::patch('/settings/members/{member}/projects', [WorkspaceMembersController::class, 'updateProjectAccess'])->name('settings.members.projects');
     Route::delete('/settings/members/{member}', [WorkspaceMembersController::class, 'remove'])->name('settings.members.remove');
+    Route::patch('/settings/members/invitations/{invitation}/projects', [WorkspaceMembersController::class, 'updateInvitationProjects'])->name('settings.members.invitations.projects');
     Route::delete('/settings/members/invitations/{invitation}', [WorkspaceMembersController::class, 'revoke'])->name('settings.members.revoke');
 
     // Workspaces

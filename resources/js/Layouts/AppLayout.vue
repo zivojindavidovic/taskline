@@ -93,7 +93,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { usePage, router } from '@inertiajs/vue3'
 import NavItem from '@/Components/UI/NavItem.vue'
 import Avatar from '@/Components/UI/Avatar.vue'
@@ -141,6 +141,26 @@ const isOwner = computed(() =>
 function logout() {
   router.post(route('logout'))
 }
+
+// Realtime: when an owner changes my project access, refresh sidebar + current
+// page so the new project appears (or the revoked one disappears) without a
+// manual reload.
+let userChannelName = null
+onMounted(() => {
+  const uid = user.value?.id
+  if (!uid || !window.Echo) return
+
+  userChannelName = `App.Models.User.${uid}`
+  window.Echo.private(userChannelName)
+    .listen('MemberProjectAccessUpdated', () => {
+      router.reload({ preserveScroll: true, preserveState: true })
+    })
+})
+
+onBeforeUnmount(() => {
+  if (userChannelName && window.Echo) window.Echo.leave(userChannelName)
+  userChannelName = null
+})
 </script>
 
 <style scoped>
