@@ -88,20 +88,54 @@ class TaskService
             'meta'       => ['subtask_key' => $subtask->key, 'title' => $subtask->title],
         ]);
 
+        $parent->refresh()->load([
+            'assignee',
+            'assignees',
+            'subtasks.assignee',
+            'subtasks.assignees',
+            'subtasks.boardColumn',
+        ]);
+        broadcast(new TaskUpdated($parent))->toOthers();
+
         return $subtask;
     }
 
     public function updateSubtask(Task $parent, Task $subtask, array $data, int $userId): Task
     {
-        $this->repository->updateSubtask($subtask, $data);
+        $assigneeIds = null;
+        if (array_key_exists('assignee_ids', $data)) {
+            $assigneeIds = $data['assignee_ids'] ?? [];
+            unset($data['assignee_ids']);
+        }
+
+        if (!empty($data)) {
+            $this->repository->updateSubtask($subtask, $data);
+        }
+
+        if ($assigneeIds !== null) {
+            $this->repository->syncAssignees($subtask, $assigneeIds);
+            $subtask->refresh();
+        }
+
+        $changes = array_keys($data);
+        if ($assigneeIds !== null) $changes[] = 'assignee_ids';
 
         AuditLog::create([
             'user_id'    => $userId,
             'project_id' => $parent->project_id,
             'task_id'    => $parent->id,
             'action'     => 'task.subtask_updated',
-            'meta'       => ['subtask_key' => $subtask->key, 'changes' => array_keys($data)],
+            'meta'       => ['subtask_key' => $subtask->key, 'changes' => $changes],
         ]);
+
+        $parent->refresh()->load([
+            'assignee',
+            'assignees',
+            'subtasks.assignee',
+            'subtasks.assignees',
+            'subtasks.boardColumn',
+        ]);
+        broadcast(new TaskUpdated($parent))->toOthers();
 
         return $subtask;
     }

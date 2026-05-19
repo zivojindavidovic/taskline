@@ -472,8 +472,21 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 onMounted(() => {
   window.Echo.private(`project.${props.project.id}`)
     .listen('TaskUpdated', ({ task }) => {
+      if (task.parent_task_id) {
+        if (activeTask.value?.id === task.id) activeTask.value = task
+        return
+      }
       const idx = localTasks.value.findIndex(t => t.id === task.id)
-      if (idx >= 0) localTasks.value[idx] = task
+      const belongs = props.isAll
+        || (props.isBacklog && !task.sprint_id)
+        || (!!props.currentSprint && task.sprint_id === props.currentSprint.id)
+      if (idx >= 0 && !belongs) {
+        localTasks.value.splice(idx, 1)
+      } else if (idx < 0 && belongs) {
+        localTasks.value.push(task)
+      } else if (idx >= 0) {
+        localTasks.value[idx] = task
+      }
       if (activeTask.value?.id === task.id) activeTask.value = task
     })
     .listen('TaskCreated', ({ task }) => {

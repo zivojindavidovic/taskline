@@ -604,19 +604,33 @@
           <span>Subtask</span>
         </div>
 
-        <div class="panel-title static">{{ openSubtask.title }}</div>
+        <div
+          ref="subtaskTitleEl"
+          :key="openSubtask.id"
+          class="panel-title"
+          :contenteditable="!locked"
+          spellcheck="false"
+          data-placeholder="Subtask title"
+          @blur="onSubtaskTitleBlur"
+          @keydown.enter.prevent="onSubtaskTitleEnter"
+        >{{ openSubtask.title }}</div>
 
         <div class="panel-section">
           <div class="props">
-            <!-- Assignee -->
-            <div class="key">Assignee</div>
+            <!-- Assignees -->
+            <div class="key">Assignees</div>
             <div class="val">
               <DropdownMenu :width="220">
                 <template #trigger>
                   <span class="prop-pill">
-                    <template v-if="openSubtask.assignee">
-                      <Avatar :name="openSubtask.assignee.name" size="sm" />
-                      <span>{{ openSubtask.assignee.name }}</span>
+                    <template v-if="currentSubtaskAssignees.length">
+                      <span class="assignee-stack">
+                        <span v-for="u in currentSubtaskAssignees.slice(0, 3)" :key="u.id" class="stack-item">
+                          <Avatar :name="u.name" size="sm" />
+                        </span>
+                        <span v-if="currentSubtaskAssignees.length > 3" class="avatar-more">+{{ currentSubtaskAssignees.length - 3 }}</span>
+                      </span>
+                      <span>{{ currentSubtaskAssignees.length === 1 ? currentSubtaskAssignees[0].name : `${currentSubtaskAssignees.length} people` }}</span>
                     </template>
                     <template v-else>
                       <span class="avatar-empty">?</span>
@@ -626,8 +640,8 @@
                 </template>
                 <div>
                   <div class="menu-label">Assign to</div>
-                  <MenuItem :disabled="locked" @click="!locked && emit('subtaskUpdate', openSubtask.id, { assignee_id: null })">
-                    <span class="check-slot"><CheckIcon v-if="!openSubtask.assignee_id" class="check" /></span>
+                  <MenuItem :disabled="locked" data-keep-open @click="!locked && subtaskClearAssignees()">
+                    <span class="check-slot"><CheckIcon v-if="!localSubtaskAssigneeIds.length" class="check" /></span>
                     Unassigned
                   </MenuItem>
                   <div class="menu-divider" />
@@ -635,9 +649,10 @@
                     v-for="u in allUsers"
                     :key="u.id"
                     :disabled="locked"
-                    @click="!locked && emit('subtaskUpdate', openSubtask.id, { assignee_id: u.id })"
+                    data-keep-open
+                    @click="!locked && subtaskToggleAssignee(u.id)"
                   >
-                    <span class="check-slot"><CheckIcon v-if="u.id === openSubtask.assignee_id" class="check" /></span>
+                    <span class="check-slot"><CheckIcon v-if="localSubtaskAssigneeIds.includes(u.id)" class="check" /></span>
                     <Avatar :name="u.name" size="sm" />
                     <span>{{ u.name }}</span>
                   </MenuItem>
@@ -666,20 +681,32 @@
               </DropdownMenu>
             </div>
 
-            <!-- Due date -->
-            <div class="key">Due date</div>
+            <!-- Dates -->
+            <div class="key">Dates</div>
             <div class="val">
-              <DropdownMenu :width="240">
+              <DropdownMenu :width="280">
                 <template #trigger>
                   <span class="prop-pill">
                     <CalendarIcon class="dim" />
-                    <span v-if="openSubtask.due_date">{{ formatDate(openSubtask.due_date) }}</span>
-                    <span v-else class="muted">Not set</span>
+                    <span v-if="openSubtask.start_date || openSubtask.due_date">
+                      {{ subtaskDateRangeLabel }}
+                    </span>
+                    <span v-else class="muted">Set dates…</span>
                   </span>
                 </template>
                 <div class="dropdown-pad" @click.stop>
-                  <div class="menu-label">Due date</div>
+                  <div class="menu-label">Date range</div>
                   <div class="date-fields">
+                    <label class="field-block">
+                      <span class="field-label">Start</span>
+                      <input
+                        type="date"
+                        :value="dateValue(openSubtask.start_date)"
+                        :disabled="locked"
+                        class="input"
+                        @change="e => !locked && emit('subtaskUpdate', openSubtask.id, { start_date: e.target.value || null })"
+                      />
+                    </label>
                     <label class="field-block">
                       <span class="field-label">Due</span>
                       <input
@@ -691,13 +718,13 @@
                       />
                     </label>
                     <button
-                      v-if="openSubtask.due_date"
+                      v-if="openSubtask.start_date || openSubtask.due_date"
                       type="button"
                       class="btn ghost sm clear-btn"
                       :disabled="locked"
-                      @click="!locked && emit('subtaskUpdate', openSubtask.id, { due_date: null })"
+                      @click="!locked && emit('subtaskUpdate', openSubtask.id, { start_date: null, due_date: null })"
                     >
-                      <CloseIcon /> Clear
+                      <CloseIcon /> Clear dates
                     </button>
                   </div>
                 </div>
@@ -914,7 +941,48 @@ function toggleTag(tag) {
 }
 
 const subtaskTagSearch = ref('')
-const subtaskDescEl   = ref(null)
+const subtaskDescEl    = ref(null)
+const subtaskTitleEl   = ref(null)
+
+// Multi-assignee for the open subtask
+const localSubtaskAssigneeIds = ref([])
+watch(openSubtask, (s) => {
+  localSubtaskAssigneeIds.value = s?.assignees?.map(u => u.id) ?? (s?.assignee_id ? [s.assignee_id] : [])
+}, { immediate: true })
+const currentSubtaskAssignees = computed(() =>
+  localSubtaskAssigneeIds.value.map(id => props.allUsers.find(u => u.id === id)).filter(Boolean)
+)
+function subtaskToggleAssignee(id) {
+  if (!openSubtask.value) return
+  const idx = localSubtaskAssigneeIds.value.indexOf(id)
+  if (idx === -1) localSubtaskAssigneeIds.value = [...localSubtaskAssigneeIds.value, id]
+  else localSubtaskAssigneeIds.value = localSubtaskAssigneeIds.value.filter(i => i !== id)
+  emit('subtaskUpdate', openSubtask.value.id, { assignee_ids: localSubtaskAssigneeIds.value })
+}
+function subtaskClearAssignees() {
+  if (!openSubtask.value) return
+  localSubtaskAssigneeIds.value = []
+  emit('subtaskUpdate', openSubtask.value.id, { assignee_ids: [] })
+}
+
+const subtaskDateRangeLabel = computed(() => {
+  const s = openSubtask.value?.start_date, d = openSubtask.value?.due_date
+  if (s && d && s !== d) return `${formatDate(s)} → ${formatDate(d)}`
+  return formatDate(d || s)
+})
+
+function onSubtaskTitleBlur(e) {
+  if (!openSubtask.value) return
+  const val = e.target.innerText.trim()
+  if (val && val !== openSubtask.value.title) {
+    emit('subtaskUpdate', openSubtask.value.id, { title: val })
+  } else if (!val && subtaskTitleEl.value) {
+    subtaskTitleEl.value.innerText = openSubtask.value.title
+  }
+}
+function onSubtaskTitleEnter(e) {
+  e.target.blur()
+}
 
 // Multi-assignee
 const localAssigneeIds = ref(
@@ -1366,11 +1434,6 @@ function copyLink() { navigator.clipboard?.writeText(window.location.href) }
   font-size: 12px; color: var(--fg-subtle);
   margin-bottom: -8px;
 }
-.panel-title.static {
-  cursor: default;
-}
-.panel-title.static:hover { background: transparent; }
-
 .dim { color: var(--fg-muted); }
 .dim :deep(svg) { width: 13px; height: 13px; color: var(--fg-muted); }
 

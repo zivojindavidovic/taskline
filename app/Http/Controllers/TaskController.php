@@ -201,14 +201,19 @@ class TaskController extends Controller
         $this->authorizeTaskAccess($task);
         abort_unless($subtask->parent_task_id === $task->id, 404);
 
+        $workspaceUserIds = $this->workspaceUserIds($task->project);
+
         $data = $request->validate([
-            'title'       => 'sometimes|string|max:255',
-            'priority'    => 'sometimes|in:urgent,high,med,low',
-            'assignee_id' => 'sometimes|nullable|integer|exists:users,id',
-            'due_date'    => 'sometimes|nullable|date',
-            'tags'        => 'sometimes|nullable|array',
-            'tags.*'      => 'string|max:50',
-            'description' => 'sometimes|nullable|string',
+            'title'          => 'sometimes|string|max:255',
+            'priority'       => 'sometimes|in:urgent,high,med,low',
+            'assignee_id'    => ['sometimes', 'nullable', Rule::in(array_merge([null], $workspaceUserIds))],
+            'assignee_ids'   => 'sometimes|array',
+            'assignee_ids.*' => ['integer', Rule::in($workspaceUserIds)],
+            'start_date'     => 'sometimes|nullable|date',
+            'due_date'       => 'sometimes|nullable|date',
+            'tags'           => 'sometimes|nullable|array',
+            'tags.*'         => 'string|max:50',
+            'description'    => 'sometimes|nullable|string',
         ]);
 
         $this->taskService->updateSubtask($task, $subtask, $data, auth()->id());
