@@ -1148,17 +1148,18 @@ function formatAgo(date) {
 }
 function auditLabel(action, meta) {
   switch (action) {
-    case 'task.created':          return 'created this task'
-    case 'task.completed':        return 'marked as completed'
-    case 'task.reopened':         return 'reopened the task'
-    case 'task.moved':            return `moved to ${meta?.column ?? '—'}`
-    case 'task.renamed':          return 'renamed the task'
-    case 'task.assigned':         return 'updated assignee'
-    case 'task.priority_changed': return `changed priority to ${meta?.priority ?? '—'}`
-    case 'task.tags_updated':     return 'updated tags'
-    case 'task.updated':          return 'updated the task'
-    case 'task.subtask_added':    return `added subtask "${meta?.title ?? ''}"`
-    default:                      return action
+    case 'task.created':           return 'created this task'
+    case 'task.completed':         return 'marked as completed'
+    case 'task.reopened':          return 'reopened the task'
+    case 'task.moved':             return `moved to ${meta?.column ?? '—'}`
+    case 'task.moved_to_backlog':  return 'moved to Backlog'
+    case 'task.renamed':           return 'renamed the task'
+    case 'task.assigned':          return 'updated assignee'
+    case 'task.priority_changed':  return `changed priority to ${meta?.priority ?? '—'}`
+    case 'task.tags_updated':      return 'updated tags'
+    case 'task.updated':           return 'updated the task'
+    case 'task.subtask_added':     return `added subtask "${meta?.title ?? ''}"`
+    default:                       return action
   }
 }
 

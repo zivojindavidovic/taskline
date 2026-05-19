@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Events\TaskUpdated;
 use App\Models\AuditLog;
 use App\Models\BoardColumn;
+use App\Models\Sprint;
 use App\Models\Task;
 use App\Repositories\TaskRepository;
 
@@ -14,6 +15,15 @@ class TaskService
 
     public function update(Task $task, array $data, int $userId): Task
     {
+        // A sprint that's locked is sealed — block any payload that would route
+        // a task into it. Removing a task FROM a locked sprint stays allowed so
+        // mistakes can be undone.
+        if (array_key_exists('sprint_id', $data) && $data['sprint_id'] !== null
+            && (int) $data['sprint_id'] !== (int) $task->sprint_id) {
+            $targetSprint = Sprint::find($data['sprint_id']);
+            abort_if($targetSprint?->locked, 422, 'Sprint is locked. No new tasks can be added.');
+        }
+
         // Extract assignee_ids before passing the rest to the column update — the
         // pivot is synced separately.
         $assigneeIds = null;
@@ -22,8 +32,21 @@ class TaskService
             unset($data['assignee_ids']);
         }
 
-        $action = $this->resolveAuditAction($task, $data, $assigneeIds);
-        $meta   = $this->resolveAuditMeta($task, $data, $assigneeIds);
+        // Cross-project move: drop the task in the new project's first column
+        // and move it to backlog (sprint_id = null). The old column/sprint belong
+        // to the old project, so retaining them would leave the task pointing at
+        // a board/sprint it no longer lives in.
+        $previousProjectId = $task->project_id;
+        $isBacklogMove = $this->isExplicitBacklogMove($task, $data);
+        if (isset($data['project_id']) && (int) $data['project_id'] !== (int) $task->project_id) {
+            $data['board_column_id'] = $this->resolveFirstColumnId((int) $data['project_id']);
+            if (!array_key_exists('sprint_id', $data)) {
+                $data['sprint_id'] = null;
+            }
+        }
+
+        $action = $this->resolveAuditAction($task, $data, $assigneeIds, $isBacklogMove);
+        $meta   = $this->resolveAuditMeta($task, $data, $assigneeIds, $previousProjectId, $isBacklogMove);
 
         if (!empty($data)) {
             $this->repository->update($task, $data);
@@ -145,23 +168,44 @@ class TaskService
         $this->repository->delete($task);
     }
 
-    private function resolveAuditAction(Task $task, array $data, ?array $assigneeIds = null): string
+    private function resolveAuditAction(Task $task, array $data, ?array $assigneeIds = null, bool $isBacklogMove = false): string
     {
-        if (isset($data['board_column_id']) && $data['board_column_id'] != $task->board_column_id) {
+        // A project change takes priority — moving across projects also resets
+        // board_column_id and sprint_id, but the *meaning* of the action is the
+        // project move, not an in-project column shuffle.
+        if (isset($data['project_id']) && (int) $data['project_id'] !== (int) $task->project_id) {
+            return 'task.project_changed';
+        }
+        // Sprint cleared (sprint_id transitioning from a value to null) — within
+        // the same project this is the canonical "move to backlog" action.
+        if ($isBacklogMove) {
+            return 'task.moved_to_backlog';
+        }
+        if (array_key_exists('board_column_id', $data) && $data['board_column_id'] != $task->board_column_id) {
             return 'task.moved';
         }
         if (array_key_exists('assignee_id', $data) || $assigneeIds !== null) return 'task.assigned';
         if (isset($data['priority']))                return 'task.priority_changed';
         if (isset($data['title']))                   return 'task.renamed';
         if (isset($data['tags']))                    return 'task.tags_updated';
-        if (isset($data['project_id']))              return 'task.project_changed';
-        if (array_key_exists('sprint_id', $data))   return 'task.sprint_changed';
+        if (array_key_exists('sprint_id', $data))    return 'task.sprint_changed';
         return 'task.updated';
     }
 
-    private function resolveAuditMeta(Task $task, array $data, ?array $assigneeIds = null): array
+    private function resolveAuditMeta(Task $task, array $data, ?array $assigneeIds = null, ?int $previousProjectId = null, bool $isBacklogMove = false): array
     {
-        if (isset($data['board_column_id']) && $data['board_column_id'] != $task->board_column_id) {
+        if (isset($data['project_id']) && (int) $data['project_id'] !== (int) ($previousProjectId ?? $task->project_id)) {
+            return [
+                'from_project_id' => $previousProjectId ?? $task->project_id,
+                'to_project_id'   => (int) $data['project_id'],
+            ];
+        }
+        if ($isBacklogMove) {
+            return [
+                'from_sprint_id' => $task->sprint_id,
+            ];
+        }
+        if (array_key_exists('board_column_id', $data) && $data['board_column_id'] != $task->board_column_id) {
             $col = BoardColumn::find($data['board_column_id']);
             return ['column' => $col?->name];
         }
@@ -170,5 +214,23 @@ class TaskService
         if (isset($data['title']))    return ['title' => $data['title']];
         if (isset($data['tags']))     return ['tags' => $data['tags']];
         return [];
+    }
+
+    private function isExplicitBacklogMove(Task $task, array $data): bool
+    {
+        $projectStays = !isset($data['project_id'])
+            || (int) $data['project_id'] === (int) $task->project_id;
+
+        return $projectStays
+            && array_key_exists('sprint_id', $data) && $data['sprint_id'] === null
+            && $task->sprint_id !== null;
+    }
+
+    private function resolveFirstColumnId(int $projectId): ?int
+    {
+        return BoardColumn::where('project_id', $projectId)
+            ->orderBy('position')
+            ->orderBy('id')
+            ->value('id');
     }
 }

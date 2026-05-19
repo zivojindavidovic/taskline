@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\Sprint;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Services\ParticipantService;
@@ -44,6 +45,11 @@ class TaskController extends Controller
             'files'           => 'nullable|array',
             'files.*'         => 'file|max:20480',
         ]);
+
+        if (!empty($data['sprint_id'])) {
+            $targetSprint = Sprint::find($data['sprint_id']);
+            abort_if($targetSprint?->locked, 422, 'Sprint is locked. No new tasks can be added.');
+        }
 
         $assigneeIds = $data['assignee_ids'] ?? null;
         if ($assigneeIds === null && !empty($data['assignee_id'])) {

@@ -115,11 +115,16 @@
                   <span class="muted">No sprint</span>
                 </MenuItem>
                 <div class="menu-divider" />
-                <MenuItem v-for="s in sprints" :key="s.id" @click="form.sprint_id = s.id">
+                <MenuItem
+                  v-for="s in sprints"
+                  :key="s.id"
+                  :disabled="s.locked"
+                  @click="!s.locked && (form.sprint_id = s.id)"
+                >
                   <span class="check-slot"><CheckIcon v-if="s.id === form.sprint_id" class="check" /></span>
                   <LightningIcon class="dim-icon" />
                   <span class="grow">{{ s.name }}</span>
-                  <LockIcon v-if="s.locked" class="dim-icon" />
+                  <span v-if="s.locked" class="locked-tail">locked</span>
                 </MenuItem>
               </div>
             </DropdownMenu>
@@ -262,7 +267,7 @@ import Avatar from '@/Components/UI/Avatar.vue'
 import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
 import AttachmentsSection from '@/Components/Task/AttachmentsSection.vue'
 import {
-  CheckIcon, CloseIcon, LightningIcon, LockIcon, CalendarIcon, PlusIcon,
+  CheckIcon, CloseIcon, LightningIcon, CalendarIcon, PlusIcon,
 } from '@/Components/UI/Icons.vue'
 
 const props = defineProps({
@@ -500,6 +505,8 @@ function submit() {
 .check        { width: 14px; height: 14px; color: var(--accent); }
 .menu-label   { font-size: 12px; color: var(--fg-subtle); padding: 6px 8px 2px; font-weight: 500; }
 .menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+.locked-tail { margin-left: auto; font-size: 11px; color: var(--fg-subtle); }
 
 .dropdown-pad { padding: 4px 8px 8px; }
 .date-fields  { display: flex; flex-direction: column; gap: 8px; }

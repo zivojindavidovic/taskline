@@ -122,6 +122,281 @@ class TaskUpdateTest extends TestCase
             ->assertUnprocessable();
     }
 
+    public function test_moving_task_to_another_project_places_it_in_first_column(): void
+    {
+        $otherProject = Project::create([
+            'name'         => 'Other Project',
+            'key'          => 'OTH',
+            'color'        => '#000',
+            'owner_id'     => $this->owner->id,
+            'workspace_id' => $this->workspace->id,
+        ]);
+        $otherProject->members()->attach($this->owner->id, ['role' => 'owner']);
+
+        // Seed columns out of order so we can confirm ordering by position
+        // (not insert order) picks the leftmost column.
+        $doing = BoardColumn::create([
+            'project_id' => $otherProject->id,
+            'name'       => 'Doing',
+            'color'      => '#fff',
+            'position'   => 1,
+        ]);
+        $todo = BoardColumn::create([
+            'project_id' => $otherProject->id,
+            'name'       => 'Todo',
+            'color'      => '#fff',
+            'position'   => 0,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patch("/tasks/{$this->task->id}", ['project_id' => $otherProject->id])
+            ->assertRedirect();
+
+        $this->task->refresh();
+        $this->assertEquals($otherProject->id, $this->task->project_id);
+        $this->assertEquals($todo->id, $this->task->board_column_id);
+        $this->assertNotEquals($doing->id, $this->task->board_column_id);
+    }
+
+    public function test_moving_task_to_another_project_moves_it_to_backlog(): void
+    {
+        $otherProject = Project::create([
+            'name'         => 'Other Project',
+            'key'          => 'OTH',
+            'color'        => '#000',
+            'owner_id'     => $this->owner->id,
+            'workspace_id' => $this->workspace->id,
+        ]);
+        $otherProject->members()->attach($this->owner->id, ['role' => 'owner']);
+        BoardColumn::create([
+            'project_id' => $otherProject->id,
+            'name'       => 'Todo',
+            'color'      => '#fff',
+            'position'   => 0,
+        ]);
+
+        // Task starts inside Sprint 1 of the source project.
+        $this->assertNotNull($this->task->sprint_id);
+
+        $this->actingAs($this->owner)
+            ->patch("/tasks/{$this->task->id}", ['project_id' => $otherProject->id])
+            ->assertRedirect();
+
+        $this->task->refresh();
+        $this->assertEquals($otherProject->id, $this->task->project_id);
+        $this->assertNull($this->task->sprint_id);
+    }
+
+    public function test_moving_task_to_project_with_no_columns_clears_column(): void
+    {
+        $emptyProject = Project::create([
+            'name'         => 'Empty Project',
+            'key'          => 'EMP',
+            'color'        => '#000',
+            'owner_id'     => $this->owner->id,
+            'workspace_id' => $this->workspace->id,
+        ]);
+        $emptyProject->members()->attach($this->owner->id, ['role' => 'owner']);
+
+        $this->actingAs($this->owner)
+            ->patch("/tasks/{$this->task->id}", ['project_id' => $emptyProject->id])
+            ->assertRedirect();
+
+        $this->task->refresh();
+        $this->assertEquals($emptyProject->id, $this->task->project_id);
+        $this->assertNull($this->task->board_column_id);
+        $this->assertNull($this->task->sprint_id);
+    }
+
+    public function test_first_column_is_resolved_per_destination_project(): void
+    {
+        // Source project's column at position 0 should not "shadow" the
+        // destination's column at position 0 — we resolve per project_id.
+        $otherProject = Project::create([
+            'name'         => 'Other Project',
+            'key'          => 'OTH',
+            'color'        => '#000',
+            'owner_id'     => $this->owner->id,
+            'workspace_id' => $this->workspace->id,
+        ]);
+        $otherProject->members()->attach($this->owner->id, ['role' => 'owner']);
+        $otherTodo = BoardColumn::create([
+            'project_id' => $otherProject->id,
+            'name'       => 'Todo',
+            'color'      => '#fff',
+            'position'   => 0,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patch("/tasks/{$this->task->id}", ['project_id' => $otherProject->id]);
+
+        $this->task->refresh();
+        $this->assertEquals($otherTodo->id, $this->task->board_column_id);
+        $this->assertNotEquals($this->column->id, $this->task->board_column_id);
+    }
+
+    public function test_same_project_update_preserves_column_and_sprint(): void
+    {
+        $originalColumnId = $this->task->board_column_id;
+        $originalSprintId = $this->task->sprint_id;
+
+        // Issue a same-project update touching only the title — confirm the
+        // cross-project reset logic does not fire when the project is unchanged.
+        $this->actingAs($this->owner)
+            ->patch("/tasks/{$this->task->id}", [
+                'project_id' => $this->project->id,
+                'title'      => 'Renamed in place',
+            ])
+            ->assertRedirect();
+
+        $this->task->refresh();
+        $this->assertEquals($originalColumnId, $this->task->board_column_id);
+        $this->assertEquals($originalSprintId, $this->task->sprint_id);
+        $this->assertEquals('Renamed in place', $this->task->title);
+    }
+
+    // -----------------------------------------------------------------------
+    // Move to Backlog (no project change)
+    // -----------------------------------------------------------------------
+
+    public function test_task_can_be_moved_to_backlog_without_changing_project(): void
+    {
+        $this->actingAs($this->owner)
+            ->patch("/tasks/{$this->task->id}", ['sprint_id' => null])
+            ->assertRedirect();
+
+        $this->task->refresh();
+        $this->assertEquals($this->project->id, $this->task->project_id);
+        // Backlog is just "no sprint" — the task stays in the same column.
+        $this->assertEquals($this->column->id, $this->task->board_column_id);
+        $this->assertNull($this->task->sprint_id);
+    }
+
+    public function test_backlog_move_preserves_current_column(): void
+    {
+        // Put the task in a non-first column so we can prove the column is
+        // not touched by the backlog move.
+        $doing = BoardColumn::create([
+            'project_id' => $this->project->id,
+            'name'       => 'Doing',
+            'color'      => '#aaa',
+            'position'   => 1,
+        ]);
+        $this->task->update(['board_column_id' => $doing->id]);
+
+        $this->actingAs($this->owner)
+            ->patch("/tasks/{$this->task->id}", ['sprint_id' => null]);
+
+        $this->task->refresh();
+        $this->assertEquals($doing->id, $this->task->board_column_id);
+        $this->assertNull($this->task->sprint_id);
+    }
+
+    public function test_backlog_move_logs_dedicated_audit_action(): void
+    {
+        $originalSprintId = $this->task->sprint_id;
+
+        $this->actingAs($this->owner)
+            ->patch("/tasks/{$this->task->id}", ['sprint_id' => null]);
+
+        $log = \App\Models\AuditLog::where('task_id', $this->task->id)
+            ->where('action', 'task.moved_to_backlog')
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($log, 'Expected a task.moved_to_backlog audit log entry.');
+        $this->assertEquals($originalSprintId, $log->meta['from_sprint_id']);
+        $this->assertArrayNotHasKey('from_column_id', $log->meta);
+    }
+
+    public function test_backlog_move_is_idempotent_when_task_already_in_backlog(): void
+    {
+        // Task starts in a column with no sprint — already in backlog.
+        $backlogTask = Task::create([
+            'key'             => 'TST-9',
+            'title'           => 'Already in backlog',
+            'project_id'      => $this->project->id,
+            'sprint_id'       => null,
+            'board_column_id' => $this->column->id,
+            'created_by'      => $this->owner->id,
+            'priority'        => 'med',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patch("/tasks/{$backlogTask->id}", ['sprint_id' => null])
+            ->assertRedirect();
+
+        $backlogTask->refresh();
+        $this->assertEquals($this->project->id, $backlogTask->project_id);
+        $this->assertEquals($this->column->id, $backlogTask->board_column_id);
+        $this->assertNull($backlogTask->sprint_id);
+
+        // A null-to-null sprint update is not a backlog move — sprint didn't
+        // actually transition. No moved_to_backlog audit should be recorded.
+        $this->assertDatabaseMissing('audit_logs', [
+            'task_id' => $backlogTask->id,
+            'action'  => 'task.moved_to_backlog',
+        ]);
+    }
+
+    public function test_cross_project_move_is_not_logged_as_backlog_move(): void
+    {
+        // Cross-project moves null the destination sprint as a side effect, but
+        // the user intent was "change project". The audit log must reflect that.
+        $emptyProject = Project::create([
+            'name'         => 'Empty Project',
+            'key'          => 'EMP',
+            'color'        => '#000',
+            'owner_id'     => $this->owner->id,
+            'workspace_id' => $this->workspace->id,
+        ]);
+        $emptyProject->members()->attach($this->owner->id, ['role' => 'owner']);
+
+        $this->actingAs($this->owner)
+            ->patch("/tasks/{$this->task->id}", ['project_id' => $emptyProject->id]);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'task_id' => $this->task->id,
+            'action'  => 'task.project_changed',
+        ]);
+        $this->assertDatabaseMissing('audit_logs', [
+            'task_id' => $this->task->id,
+            'action'  => 'task.moved_to_backlog',
+        ]);
+    }
+
+    // -----------------------------------------------------------------------
+
+    public function test_cross_project_move_records_from_and_to_in_audit_meta(): void
+    {
+        $otherProject = Project::create([
+            'name'         => 'Other Project',
+            'key'          => 'OTH',
+            'color'        => '#000',
+            'owner_id'     => $this->owner->id,
+            'workspace_id' => $this->workspace->id,
+        ]);
+        $otherProject->members()->attach($this->owner->id, ['role' => 'owner']);
+        BoardColumn::create([
+            'project_id' => $otherProject->id,
+            'name'       => 'Todo',
+            'color'      => '#fff',
+            'position'   => 0,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->patch("/tasks/{$this->task->id}", ['project_id' => $otherProject->id]);
+
+        $log = \App\Models\AuditLog::where('task_id', $this->task->id)
+            ->where('action', 'task.project_changed')
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($log);
+        $this->assertEquals($this->project->id, $log->meta['from_project_id']);
+        $this->assertEquals($otherProject->id, $log->meta['to_project_id']);
+    }
+
     // -----------------------------------------------------------------------
     // Sprint update
     // -----------------------------------------------------------------------
@@ -207,6 +482,163 @@ class TaskUpdateTest extends TestCase
             ->withHeaders(['Accept' => 'application/json'])
             ->patch("/tasks/{$this->task->id}", ['sprint_id' => 99999])
             ->assertUnprocessable();
+    }
+
+    // -----------------------------------------------------------------------
+    // Locked sprint guard — no new tasks may be assigned to a locked sprint
+    // -----------------------------------------------------------------------
+
+    public function test_task_cannot_be_added_to_locked_sprint(): void
+    {
+        $lockedSprint = Sprint::create([
+            'project_id' => $this->project->id,
+            'name'       => 'Locked Sprint',
+            'locked'     => true,
+        ]);
+
+        $backlogTask = Task::create([
+            'key'             => 'TST-2',
+            'title'           => 'Backlog task',
+            'project_id'      => $this->project->id,
+            'sprint_id'       => null,
+            'board_column_id' => $this->column->id,
+            'created_by'      => $this->owner->id,
+            'priority'        => 'med',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->withHeaders(['Accept' => 'application/json'])
+            ->patch("/tasks/{$backlogTask->id}", ['sprint_id' => $lockedSprint->id])
+            ->assertStatus(422);
+
+        $this->assertDatabaseHas('tasks', [
+            'id'        => $backlogTask->id,
+            'sprint_id' => null,
+        ]);
+    }
+
+    public function test_task_cannot_be_moved_from_one_sprint_to_locked_sprint(): void
+    {
+        $lockedSprint = Sprint::create([
+            'project_id' => $this->project->id,
+            'name'       => 'Locked Sprint',
+            'locked'     => true,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->withHeaders(['Accept' => 'application/json'])
+            ->patch("/tasks/{$this->task->id}", ['sprint_id' => $lockedSprint->id])
+            ->assertStatus(422);
+
+        $this->assertDatabaseHas('tasks', [
+            'id'        => $this->task->id,
+            'sprint_id' => $this->sprint->id,
+        ]);
+    }
+
+    public function test_task_can_be_removed_from_locked_sprint(): void
+    {
+        // Lock the sprint AFTER the task is already in it. Removing the task
+        // back to backlog is allowed (the guard only blocks adding).
+        $this->sprint->update(['locked' => true]);
+
+        $this->actingAs($this->owner)
+            ->patch("/tasks/{$this->task->id}", ['sprint_id' => null])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('tasks', [
+            'id'        => $this->task->id,
+            'sprint_id' => null,
+        ]);
+    }
+
+    public function test_no_op_sprint_update_does_not_trigger_lock_guard(): void
+    {
+        // Setting sprint_id to the SAME sprint should be a no-op even when
+        // that sprint is locked — the guard targets transitions INTO a sprint,
+        // not idempotent payloads.
+        $this->sprint->update(['locked' => true]);
+
+        $this->actingAs($this->owner)
+            ->patch("/tasks/{$this->task->id}", ['sprint_id' => $this->sprint->id])
+            ->assertRedirect();
+    }
+
+    public function test_task_cannot_be_created_in_locked_sprint(): void
+    {
+        $lockedSprint = Sprint::create([
+            'project_id' => $this->project->id,
+            'name'       => 'Locked Sprint',
+            'locked'     => true,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->withHeaders(['Accept' => 'application/json'])
+            ->post('/tasks', [
+                'project_id'      => $this->project->id,
+                'sprint_id'       => $lockedSprint->id,
+                'board_column_id' => $this->column->id,
+                'title'           => 'New task',
+                'priority'        => 'med',
+            ])
+            ->assertStatus(422);
+
+        $this->assertDatabaseMissing('tasks', [
+            'title' => 'New task',
+        ]);
+    }
+
+    public function test_task_can_be_created_in_backlog_when_locked_sprint_exists(): void
+    {
+        Sprint::create([
+            'project_id' => $this->project->id,
+            'name'       => 'Locked Sprint',
+            'locked'     => true,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->post('/tasks', [
+                'project_id'      => $this->project->id,
+                'sprint_id'       => null,
+                'board_column_id' => $this->column->id,
+                'title'           => 'Backlog task',
+                'priority'        => 'med',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('tasks', [
+            'title'     => 'Backlog task',
+            'sprint_id' => null,
+        ]);
+    }
+
+    public function test_task_can_be_created_in_unlocked_sprint_even_when_another_is_locked(): void
+    {
+        Sprint::create([
+            'project_id' => $this->project->id,
+            'name'       => 'Locked Sprint',
+            'locked'     => true,
+        ]);
+        $openSprint = Sprint::create([
+            'project_id' => $this->project->id,
+            'name'       => 'Open Sprint',
+            'locked'     => false,
+        ]);
+
+        $this->actingAs($this->owner)
+            ->post('/tasks', [
+                'project_id'      => $this->project->id,
+                'sprint_id'       => $openSprint->id,
+                'board_column_id' => $this->column->id,
+                'title'           => 'Open task',
+                'priority'        => 'med',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('tasks', [
+            'title'     => 'Open task',
+            'sprint_id' => $openSprint->id,
+        ]);
     }
 
     // -----------------------------------------------------------------------
