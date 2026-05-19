@@ -53,7 +53,7 @@
           <span>Workspace</span>
         </div>
         <NavItem :href="route('members')" :active="isActive('members')">
-          <UsersIcon class="nav-icon" /> Members
+          <UserIcon class="nav-icon" /> Members
         </NavItem>
         <NavItem :href="route('audit')" :active="isActive('audit')">
           <HistoryIcon class="nav-icon" /> Audit log
@@ -65,15 +65,13 @@
       </nav>
 
       <!-- User bar -->
-      <div class="user-bar">
-        <div class="user-bar-inner" @click="router.visit(route('profile.edit'))">
-          <Avatar :name="user.name" :color="user.avatar_color || null" size="sm" />
-          <div class="user-info">
-            <div class="user-name">{{ user.name }}</div>
-            <div class="user-role">{{ isOwner ? 'Owner' : 'Member' }}</div>
-          </div>
+      <div class="user-bar" @click="router.visit(route('profile.edit'))" title="View profile">
+        <Avatar :name="user.name" :color="user.avatar_color || null" size="sm" />
+        <div class="user-info">
+          <div class="user-name">{{ user.name }}</div>
+          <div class="user-role">{{ isOwner ? 'Owner' : 'Member' }}</div>
         </div>
-        <button class="logout-btn" title="Log out" @click="logout">
+        <button class="logout-btn" title="Sign out" aria-label="Sign out" @click.stop="logout">
           <LogoutIcon style="width:14px;height:14px" />
         </button>
       </div>
@@ -104,7 +102,7 @@ import WorkspaceSettingsModal from '@/Components/Modals/WorkspaceSettingsModal.v
 import { useToast } from '@/composables/useToast'
 import {
   ChevronIcon, HomeIcon, InboxIcon, UserIcon,
-  PlusIcon, HistoryIcon, SettingsIcon, UsersIcon, LogoutIcon,
+  PlusIcon, HistoryIcon, SettingsIcon, LogoutIcon,
 } from '@/Components/UI/Icons.vue'
 
 const page = usePage()
@@ -187,8 +185,8 @@ onBeforeUnmount(() => {
 .workspace-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-3);
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   user-select: none;
@@ -198,33 +196,33 @@ onBeforeUnmount(() => {
 
 .ws-logo {
   width: 24px; height: 24px;
-  border-radius: 5px;
+  border-radius: var(--r-sm);
   background: var(--accent);
-  color: #fff;
-  font-size: 12px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
+  color: var(--accent-fg);
+  font-size: 12px; font-weight: 600;
+  display: grid; place-items: center;
   flex-shrink: 0;
 }
 .ws-name {
   flex: 1; min-width: 0;
-  font-size: 13px; font-weight: 600;
+  font-size: var(--fs-13); font-weight: 600;
   color: var(--fg);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.ws-chev { width: 14px; height: 14px; color: var(--fg-subtle); flex-shrink: 0; }
+.ws-chev { color: var(--fg-subtle); flex-shrink: 0; }
 
 /* Nav */
 .sidebar-nav {
   flex: 1; overflow-y: auto;
-  padding: 8px;
+  padding: var(--s-2);
   display: flex; flex-direction: column;
   gap: 1px;
 }
 
 .nav-section-label {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 8px 4px;
-  font-size: 12px; font-weight: 500;
+  padding: var(--s-3) var(--s-2) var(--s-1);
+  font-size: var(--fs-12); font-weight: 500;
   color: var(--fg-subtle);
 }
 
@@ -250,7 +248,7 @@ onBeforeUnmount(() => {
 
 .nav-badge {
   margin-left: auto;
-  font-size: 11px; font-weight: 500;
+  font-size: var(--fs-12);
   color: var(--fg-subtle);
   font-variant-numeric: tabular-nums;
 }
@@ -258,10 +256,10 @@ onBeforeUnmount(() => {
 /* Settings button — matches nav-item-link exactly */
 .nav-btn {
   display: flex; align-items: center;
-  gap: 8px; padding: 0 8px;
-  height: 32px; width: 100%;
-  border-radius: 4px; border: none; background: none;
-  font-size: 13px; font-family: var(--font-ui); font-weight: 400;
+  gap: var(--s-2); padding: 0 var(--s-2);
+  height: var(--row-h); width: 100%;
+  border-radius: var(--r-sm); border: none; background: none;
+  font-size: var(--fs-13); font-family: var(--font-ui); font-weight: 400;
   color: var(--fg-muted); cursor: pointer; text-align: left;
   transition: background 80ms, color 80ms;
 }
@@ -286,35 +284,32 @@ onBeforeUnmount(() => {
 /* User bar */
 .user-bar {
   display: flex; align-items: center;
-  padding: 10px 12px; gap: 6px;
+  gap: var(--s-2);
+  padding: var(--s-3);
   border-top: 1px solid var(--border);
-}
-.user-bar-inner {
-  display: flex; align-items: center; gap: 8px;
-  flex: 1; min-width: 0; cursor: pointer;
-  border-radius: 4px; padding: 2px 4px;
+  cursor: pointer;
   transition: background 80ms;
 }
-.user-bar-inner:hover { background: var(--bg-hover); }
+.user-bar:hover { background: var(--bg-hover); }
 
 .user-info { flex: 1; min-width: 0; }
 .user-name {
-  font-size: 13px; font-weight: 500; color: var(--fg);
+  font-size: var(--fs-13); font-weight: 500; color: var(--fg);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .user-role {
-  font-size: 12px; color: var(--fg-subtle);
+  font-size: var(--fs-12); color: var(--fg-subtle);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 .logout-btn {
   display: flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; flex-shrink: 0;
-  border-radius: 5px; border: none; background: none;
-  color: var(--fg-muted); cursor: pointer;
+  width: 26px; height: 26px; flex-shrink: 0;
+  border-radius: var(--r-sm); border: none; background: none;
+  color: var(--fg-subtle); cursor: pointer;
   transition: background 80ms, color 80ms;
 }
-.logout-btn:hover { background: var(--bg-hover); color: var(--fg); }
+.logout-btn:hover { background: var(--bg-active); color: var(--fg); }
 
 /* Main */
 .main-area {

@@ -146,6 +146,12 @@ function confirmDelete() {
 function signOut() {
     router.post(route('logout'))
 }
+
+/* ── Back ─────────────────────────────────────────────────────── */
+function goBack() {
+    if (window.history.length > 1) window.history.back()
+    else router.visit(route('dashboard'))
+}
 </script>
 
 <template>
@@ -153,12 +159,17 @@ function signOut() {
 
     <AppLayout>
         <div class="profile-page">
+            <button type="button" class="back-btn" @click="goBack">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+                Back
+            </button>
+
             <h2 class="page-title">Profile settings</h2>
             <p class="page-desc">Manage your account and preferences.</p>
 
             <!-- Appearance -->
             <div class="ps">
-                <div class="ps-title">Appearance</div>
+                <div class="ps-title"><span>Appearance</span></div>
                 <div class="theme-label">Theme</div>
                 <div class="theme-grid" role="radiogroup" aria-label="Theme">
                     <button
@@ -192,7 +203,7 @@ function signOut() {
 
             <!-- Your profile -->
             <div class="ps">
-                <div class="ps-title">Your profile</div>
+                <div class="ps-title"><span>Your profile</span></div>
 
                 <div class="avatar-row">
                     <div class="avatar-preview" :style="{ background: profileForm.avatar_color }">
@@ -254,7 +265,7 @@ function signOut() {
 
             <!-- Change password -->
             <div class="ps">
-                <div class="ps-title">Change password</div>
+                <div class="ps-title"><span>Change password</span></div>
                 <form @submit.prevent="savePassword" style="display:flex;flex-direction:column;gap:12px">
                     <div class="field">
                         <label class="field-label">Current password</label>
@@ -310,27 +321,35 @@ function signOut() {
 
             <!-- Notification preferences -->
             <div class="ps">
-                <div class="ps-title">Notification preferences</div>
-                <div style="display:flex;flex-direction:column;gap:12px">
-                    <label v-for="opt in NOTIF_OPTS" :key="opt.id" class="notif-row">
-                        <div
-                            class="notif-check"
-                            :class="{ 'notif-check--on': notifs[opt.id] }"
-                            @click="notifs[opt.id] = !notifs[opt.id]"
-                        >
-                            <CheckIcon v-if="notifs[opt.id]" style="width:10px;height:10px" />
-                        </div>
-                        <span>{{ opt.label }}</span>
-                    </label>
+                <div class="ps-title">
+                    <span>Notification preferences</span>
+                    <span class="ps-badge">Coming soon</span>
                 </div>
-                <button type="button" class="btn-secondary" style="margin-top:16px" @click="saveNotifs">
-                    Save preferences
-                </button>
+                <div class="ps-coming-soon">
+                    <div class="ps-coming-soon__content" aria-hidden="true" inert>
+                        <div style="display:flex;flex-direction:column;gap:12px">
+                            <label v-for="opt in NOTIF_OPTS" :key="opt.id" class="notif-row">
+                                <div
+                                    class="notif-check"
+                                    :class="{ 'notif-check--on': notifs[opt.id] }"
+                                    @click="notifs[opt.id] = !notifs[opt.id]"
+                                >
+                                    <CheckIcon v-if="notifs[opt.id]" style="width:10px;height:10px" />
+                                </div>
+                                <span>{{ opt.label }}</span>
+                            </label>
+                        </div>
+                        <button type="button" class="btn-secondary" style="margin-top:16px" @click="saveNotifs">
+                            Save preferences
+                        </button>
+                    </div>
+                    <div class="ps-coming-soon__veil" aria-hidden="true" />
+                </div>
             </div>
 
             <!-- Account -->
             <div class="ps">
-                <div class="ps-title">Account</div>
+                <div class="ps-title"><span>Account</span></div>
 
                 <div class="account-card" style="margin-bottom:12px">
                     <div>
@@ -394,14 +413,36 @@ function signOut() {
 .profile-page {
     max-width: 640px;
     margin: 0 auto;
-    padding: 32px 40px 64px;
+    padding: 24px 32px 64px;
 }
 
+.back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 8px;
+    margin-bottom: 24px;
+    border: 1px solid transparent;
+    background: none;
+    color: var(--fg-muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 80ms, color 80ms;
+}
+.back-btn:hover { background: var(--bg-hover); color: var(--fg); }
+
 .page-title {
-    font-size: 22px;
-    font-weight: 700;
+    font-size: 20px;
+    font-weight: 600;
     color: var(--fg);
     margin: 0 0 4px;
+    line-height: 1.3;
 }
 
 .page-desc {
@@ -415,12 +456,49 @@ function signOut() {
 .ps { margin-bottom: 32px; }
 
 .ps-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-weight: 600;
     font-size: 14px;
     color: var(--fg);
     margin-bottom: 16px;
     padding-bottom: 10px;
     border-bottom: 1px solid var(--border);
+}
+
+.ps-badge {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 99px;
+    background: color-mix(in oklab, var(--accent) 12%, var(--bg-panel));
+    color: var(--accent);
+    border: 1px solid color-mix(in oklab, var(--accent) 25%, transparent);
+}
+
+/* ── Coming-soon overlay ── */
+.ps-coming-soon { position: relative; }
+
+.ps-coming-soon__content {
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.55;
+    filter: saturate(0.6);
+}
+
+.ps-coming-soon__veil {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: 6px;
+    background: linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--bg-app) 35%, transparent) 0%,
+        color-mix(in oklab, var(--bg-app) 55%, transparent) 100%
+    );
 }
 
 /* ── Theme ── */

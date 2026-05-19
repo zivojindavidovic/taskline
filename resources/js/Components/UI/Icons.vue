@@ -20,12 +20,12 @@ const ic = (svgContent) => ({
   },
 })
 
-export const HomeIcon     = ic('<path d="M2.5 7.5 8 3l5.5 4.5V13a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V7.5z"/>')
-export const InboxIcon    = ic('<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 9h3l1 2h4l1-2h3"/>')
-export const UserIcon     = ic('<circle cx="8" cy="5.5" r="2.5"/><path d="M3 13.5c.5-2.5 2.5-4 5-4s4.5 1.5 5 4"/>')
-export const PlusIcon     = ic('<path d="M8 3v10M3 8h10"/>')
-export const HistoryIcon  = ic('<path d="M2.5 8a5.5 5.5 0 1 1 1.6 3.9"/><path d="M2.5 11.5v-3h3"/><path d="M8 5v3l2 1.5"/>')
-export const SettingsIcon = ic('<circle cx="8" cy="8" r="2"/><path d="M8 1v2M8 13v2M14 8h-2M4 8H2M12.2 3.8l-1.4 1.4M5.2 10.8l-1.4 1.4M12.2 12.2l-1.4-1.4M5.2 5.2 3.8 3.8"/>')
+export const HomeIcon     = ic('<path d="M2 8L8 2L14 8V14.5H10V10H6V14.5H2z"/>')
+export const InboxIcon    = ic('<path d="M1.5 8.5l2.5-6h8l2.5 6V14H1.5zM1.5 8.5h4l1 2h3l1-2h4"/>')
+export const UserIcon     = ic('<circle cx="8" cy="5.5" r="3"/><path d="M1.5 14.5a6.5 6.5 0 0 1 13 0"/>')
+export const PlusIcon     = ic('<path d="M8 2v12M2 8h12"/>')
+export const HistoryIcon  = ic('<circle cx="9" cy="9" r="5.5"/><path d="M9 6v3.5l2.5 1.5"/><path d="M2.5 2.5v3.5h3.5"/><path d="M2.5 2.5A8 8 0 0 1 9 1"/>')
+export const SettingsIcon = ic('<circle cx="8" cy="8" r="2.5"/><path d="M8 1v1.5M8 13.5V15M15 8h-1.5M2.5 8H1M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1M12.6 12.6l-1.1-1.1M4.5 4.5L3.4 3.4"/>')
 export const ChevronIcon  = ic('<path d="m4 6 4 4 4-4"/>')
 export const ChevronRightIcon = ic('<path d="m6 4 4 4-4 4"/>')
 export const SearchIcon   = ic('<circle cx="7" cy="7" r="4.5"/><path d="m11 11 3 3"/>')
