@@ -468,6 +468,24 @@ function onClickOutside(e) {
 onMounted(() => document.addEventListener('mousedown', onClickOutside))
 onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 
+// Real-time updates via Reverb
+onMounted(() => {
+  window.Echo.private(`project.${props.project.id}`)
+    .listen('TaskUpdated', ({ task }) => {
+      const idx = localTasks.value.findIndex(t => t.id === task.id)
+      if (idx >= 0) localTasks.value[idx] = task
+      if (activeTask.value?.id === task.id) activeTask.value = task
+    })
+    .listen('TaskCreated', ({ task }) => {
+      if (!localTasks.value.find(t => t.id === task.id)) localTasks.value.push(task)
+    })
+    .listen('TaskDeleted', ({ task_id }) => {
+      localTasks.value = localTasks.value.filter(t => t.id !== task_id)
+      if (activeTask.value?.id === task_id) closeTask()
+    })
+})
+onUnmounted(() => window.Echo.leave(`project.${props.project.id}`))
+
 // Keep localTasks + activeTask in sync when Inertia refreshes props.tasks
 watch(() => props.tasks, (tasks) => {
   localTasks.value = tasks

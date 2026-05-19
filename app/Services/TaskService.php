@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\TaskUpdated;
 use App\Models\AuditLog;
 use App\Models\BoardColumn;
 use App\Models\Task;
@@ -40,6 +41,9 @@ class TaskService
             'action'     => $action,
             'meta'       => $meta,
         ]);
+
+        $task->refresh()->load(['assignee', 'assignees']);
+        broadcast(new TaskUpdated($task))->toOthers();
 
         return $task;
     }
