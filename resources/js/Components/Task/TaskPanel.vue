@@ -480,7 +480,7 @@
             :class="{ active: activeTab === 'activity' }"
             @click="activeTab = 'activity'"
           >
-            Activity <span class="badge">{{ task.audit_logs?.length ?? 0 }}</span>
+            Activity <span class="badge">{{ task.activities?.length ?? 0 }}</span>
           </button>
         </div>
 
@@ -498,7 +498,7 @@
                   <span class="author">{{ c.user?.name }}</span>
                   <span class="time">{{ formatAgo(c.created_at) }}</span>
                 </div>
-                <div class="text">{{ c.body }}</div>
+                <div class="text" v-html="renderCommentBody(c.body)" />
                 <div v-if="!locked" class="actions">
                   <button type="button" @click="replyingTo = replyingTo === c.id ? null : c.id">Reply</button>
                 </div>
@@ -513,18 +513,17 @@
                     <span class="author">{{ r.user?.name }}</span>
                     <span class="time">{{ formatAgo(r.created_at) }}</span>
                   </div>
-                  <div class="text">{{ r.body }}</div>
+                  <div class="text" v-html="renderCommentBody(r.body)" />
                 </div>
               </div>
 
               <div v-if="replyingTo === c.id" class="composer">
                 <Avatar :name="currentUser?.name" size="sm" />
                 <div class="body">
-                  <textarea
+                  <MentionTextarea
                     v-model="replyText"
-                    class="input textarea"
+                    :users="mentionableUsers"
                     :placeholder="`Reply to ${c.user?.name ?? ''}…`"
-                    autofocus
                   />
                   <div class="hstack-end">
                     <button type="button" class="btn ghost sm" @click="replyingTo = null; replyText = ''">Cancel</button>
@@ -544,9 +543,9 @@
           <div v-if="!locked" class="composer">
             <Avatar :name="currentUser?.name" size="sm" />
             <div class="body">
-              <textarea
+              <MentionTextarea
                 v-model="newComment"
-                class="input textarea"
+                :users="mentionableUsers"
                 placeholder="Add a comment… (@ to mention)"
               />
               <div class="send-row">
@@ -568,10 +567,10 @@
 
         <!-- Activity tab -->
         <div v-if="activeTab === 'activity'" class="vstack-tight">
-          <div v-if="!task.audit_logs?.length" class="muted small-pad">No activity yet.</div>
+          <div v-if="!task.activities?.length" class="muted small-pad">No activity yet.</div>
           <div
-            v-for="(a, i) in [...(task.audit_logs ?? [])].reverse()"
-            :key="i"
+            v-for="(a, i) in [...(task.activities ?? [])].reverse()"
+            :key="a.id ?? i"
             class="audit-row"
           >
             <div class="dot-col">
@@ -580,7 +579,7 @@
             </div>
             <div class="text">
               <strong>{{ a.user?.name ?? 'Someone' }}</strong>
-              {{ auditLabel(a.action, a.meta) }}
+              <span v-html="activityMessage(a)" />
             </div>
             <div class="time">{{ formatAgo(a.created_at) }}</div>
           </div>
@@ -817,16 +816,16 @@
                   <span class="author">{{ c.author ?? c.user?.name }}</span>
                   <span class="time">{{ c.time ?? formatAgo(c.created_at) }}</span>
                 </div>
-                <div class="text">{{ c.body }}</div>
+                <div class="text" v-html="renderCommentBody(c.body)" />
               </div>
             </div>
             <div v-if="!locked" class="composer">
               <Avatar :name="currentUser?.name" size="sm" />
               <div class="body">
-                <textarea
+                <MentionTextarea
                   v-model="subtaskNewComment"
-                  class="input textarea"
-                  placeholder="Add a comment…"
+                  :users="mentionableUsers"
+                  placeholder="Add a comment… (@ to mention)"
                 />
                 <div class="hstack-end">
                   <button
@@ -853,6 +852,7 @@ import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
 import DropdownMenu from '@/Components/UI/DropdownMenu.vue'
 import MenuItem from '@/Components/UI/MenuItem.vue'
 import AttachmentsSection from '@/Components/Task/AttachmentsSection.vue'
+import MentionTextarea from '@/Components/Task/MentionTextarea.vue'
 import {
   LockIcon, CheckIcon, MoreIcon, CopyIcon, LinkIcon, TrashIcon,
   CloseIcon, LightningIcon, SendIcon, CalendarIcon, PlusIcon,
@@ -896,6 +896,12 @@ function subDueInfo(sub) {
 
 const page = usePage()
 const currentUser = computed(() => page.props.auth.user)
+
+// Workspace/project members minus the current user — feeds the @-mention picker.
+const mentionableUsers = computed(() => {
+  const me = currentUser.value?.id
+  return (props.allUsers ?? []).filter(u => u.id !== me)
+})
 
 const activeTab        = ref('comments')
 const newComment       = ref('')
@@ -1031,6 +1037,7 @@ watch(() => [
   props.task?.assignees?.length,
   props.task?.assignee_id,
   props.task?.comments?.length,
+  (props.task?.comments ?? []).reduce((n, c) => n + (c.replies?.length ?? 0), 0),
   props.task?.audit_logs?.length,
   props.task?.completed_by,
 ], () => loadParticipants())
@@ -1146,20 +1153,72 @@ function formatAgo(date) {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
-function auditLabel(action, meta) {
-  switch (action) {
-    case 'task.created':           return 'created this task'
-    case 'task.completed':         return 'marked as completed'
-    case 'task.reopened':          return 'reopened the task'
-    case 'task.moved':             return `moved to ${meta?.column ?? '—'}`
-    case 'task.moved_to_backlog':  return 'moved to Backlog'
-    case 'task.renamed':           return 'renamed the task'
-    case 'task.assigned':          return 'updated assignee'
-    case 'task.priority_changed':  return `changed priority to ${meta?.priority ?? '—'}`
-    case 'task.tags_updated':      return 'updated tags'
-    case 'task.updated':           return 'updated the task'
-    case 'task.subtask_added':     return `added subtask "${meta?.title ?? ''}"`
-    default:                       return action
+function renderCommentBody(body) {
+  if (!body) return ''
+  const out = []
+  const re = /@\[([^\]]+)\]\(user:(\d+)\)/g
+  let last = 0, m
+  while ((m = re.exec(body)) !== null) {
+    out.push(escapeHtml(body.slice(last, m.index)))
+    out.push(`<span class="mention">@${escapeHtml(m[1])}</span>`)
+    last = m.index + m[0].length
+  }
+  out.push(escapeHtml(body.slice(last)))
+  return out.join('').replace(/\n/g, '<br>')
+}
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return ''
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+function truncate(s, n = 80) {
+  if (s === null || s === undefined) return ''
+  s = String(s)
+  return s.length > n ? s.slice(0, n - 1) + '…' : s
+}
+function pill(s) { return `<span class="activity-val">${escapeHtml(s)}</span>` }
+function activityMessage(a) {
+  const f = a.from_value ?? null
+  const t = a.to_value ?? null
+  const sub = a.subtask ? ` on subtask <span class="activity-val">${escapeHtml(a.subtask.title)}</span>` : ''
+  switch (a.field) {
+    case 'title':
+      return `renamed task from ${pill(truncate(f?.value, 60))} to ${pill(truncate(t?.value, 60))}${sub}`
+    case 'description':
+      if (!f?.value) return `set description${sub}`
+      if (!t?.value) return `cleared description${sub}`
+      return `changed description${sub}`
+    case 'priority':
+      return `changed priority from ${pill(f?.value ?? '—')} to ${pill(t?.value ?? '—')}${sub}`
+    case 'status':
+      return t?.value ? `completed task${sub}` : `reopened task${sub}`
+    case 'assignees': {
+      const fromNames = (f?.names ?? []).join(', ') || 'no one'
+      const toNames   = (t?.names ?? []).join(', ') || 'no one'
+      return `changed assignees from ${pill(fromNames)} to ${pill(toNames)}${sub}`
+    }
+    case 'project':
+      return `moved task from project ${pill(f?.name ?? '—')} to ${pill(t?.name ?? '—')}${sub}`
+    case 'sprint': {
+      const fromN = f?.name ?? 'Backlog'
+      const toN   = t?.name ?? 'Backlog'
+      return `moved task from ${pill(fromN)} to ${pill(toN)}${sub}`
+    }
+    case 'start_date':
+      return `changed start date from ${pill(f?.value ?? '—')} to ${pill(t?.value ?? '—')}${sub}`
+    case 'due_date':
+      return `changed due date from ${pill(f?.value ?? '—')} to ${pill(t?.value ?? '—')}${sub}`
+    case 'tags': {
+      const fromT = (f?.value ?? []).join(', ') || '—'
+      const toT   = (t?.value ?? []).join(', ') || '—'
+      return `changed tags from ${pill(fromT)} to ${pill(toT)}${sub}`
+    }
+    default:
+      return `updated ${escapeHtml(a.field)}${sub}`
   }
 }
 
@@ -1549,6 +1608,27 @@ function copyLink() { navigator.clipboard?.writeText(window.location.href) }
 .audit-row .text { flex: 1; color: var(--fg-muted); }
 .audit-row .text strong { color: var(--fg); font-weight: 600; }
 .audit-row .time { font-size: 12px; color: var(--fg-subtle); white-space: nowrap; }
+.comment .text .mention {
+  display: inline-block;
+  padding: 0 4px;
+  background: rgba(99, 102, 241, 0.12);
+  color: #4f46e5;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.audit-row .activity-val {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--bg-subtle, rgba(0,0,0,0.05));
+  color: var(--fg);
+  font-weight: 500;
+  font-size: 12.5px;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: baseline;
+}
 
 /* ===== Inputs ===== */
 .input {

@@ -2,28 +2,33 @@
 
 namespace App\Events;
 
-use App\Models\Task;
+use App\Models\TaskActivity;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class TaskCreated implements ShouldBroadcastNow
+class TaskActivityRecorded implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(public Task $task) {}
+    public function __construct(public TaskActivity $activity, public int $projectId) {}
 
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('project.' . $this->task->project_id),
+            new PrivateChannel('project.' . $this->projectId),
         ];
     }
 
     public function broadcastWith(): array
     {
-        return ['task' => $this->task->toArray()];
+        $this->activity->loadMissing([
+            'user:id,name,email,avatar_color',
+            'subtask:id,key,title',
+        ]);
+
+        return ['activity' => $this->activity->toArray()];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Events;
 
+use App\Models\CommentReply;
 use App\Models\Task;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
@@ -9,11 +10,14 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class TaskCreated implements ShouldBroadcastNow
+class ReplyAdded implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(public Task $task) {}
+    public function __construct(
+        public Task $task,
+        public CommentReply $reply,
+    ) {}
 
     public function broadcastOn(): array
     {
@@ -24,6 +28,15 @@ class TaskCreated implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
-        return ['task' => $this->task->toArray()];
+        $this->reply->loadMissing([
+            'user:id,name,email,avatar_color',
+            'mentionedUsers:id,name,email,avatar_color',
+        ]);
+
+        return [
+            'task_id'    => $this->task->id,
+            'comment_id' => $this->reply->task_comment_id,
+            'reply'      => $this->reply->toArray(),
+        ];
     }
 }

@@ -72,6 +72,11 @@ class Task extends Model
         return $this->hasMany(AuditLog::class);
     }
 
+    public function activities(): HasMany
+    {
+        return $this->hasMany(TaskActivity::class)->oldest();
+    }
+
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Task::class, 'parent_task_id');

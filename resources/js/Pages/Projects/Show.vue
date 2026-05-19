@@ -488,11 +488,32 @@ onMounted(() => document.addEventListener('mousedown', onClickOutside))
 onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 
 // Real-time updates via Reverb
+//
+// TaskUpdated broadcasts a slim task payload (assignee/assignees/board_column/
+// sprint at most). Rich relations like activities/comments/replies/subtasks are
+// not included, so blindly replacing the local task wipes them on the receiver
+// — including any activity that TaskActivityRecorded just appended (it fires
+// immediately before TaskUpdated in TaskService::update). mergeTask preserves
+// those collections instead of letting them go undefined.
+function mergeTask(existing, incoming) {
+  if (!existing) return incoming
+  return {
+    ...existing,
+    ...incoming,
+    activities: incoming.activities ?? existing.activities ?? [],
+    comments:   incoming.comments   ?? existing.comments   ?? [],
+    replies:    incoming.replies    ?? existing.replies    ?? [],
+    subtasks:   incoming.subtasks   ?? existing.subtasks   ?? [],
+  }
+}
+
 onMounted(() => {
   window.Echo.private(`project.${props.project.id}`)
     .listen('TaskUpdated', ({ task }) => {
       if (task.parent_task_id) {
-        if (activeTask.value?.id === task.id) activeTask.value = task
+        if (activeTask.value?.id === task.id) {
+          activeTask.value = mergeTask(activeTask.value, task)
+        }
         return
       }
       const idx = localTasks.value.findIndex(t => t.id === task.id)
@@ -504,9 +525,11 @@ onMounted(() => {
       } else if (idx < 0 && belongs) {
         localTasks.value.push(task)
       } else if (idx >= 0) {
-        localTasks.value[idx] = task
+        localTasks.value[idx] = mergeTask(localTasks.value[idx], task)
       }
-      if (activeTask.value?.id === task.id) activeTask.value = task
+      if (activeTask.value?.id === task.id) {
+        activeTask.value = mergeTask(activeTask.value, task)
+      }
     })
     .listen('TaskCreated', ({ task }) => {
       if (!localTasks.value.find(t => t.id === task.id)) localTasks.value.push(task)
@@ -514,6 +537,55 @@ onMounted(() => {
     .listen('TaskDeleted', ({ task_id }) => {
       localTasks.value = localTasks.value.filter(t => t.id !== task_id)
       if (activeTask.value?.id === task_id) closeTask()
+    })
+    .listen('TaskActivityRecorded', ({ activity }) => {
+      // Append the activity to whichever local task (or its open panel copy)
+      // owns it, so the Activity tab updates live for other viewers.
+      const task = localTasks.value.find(t => t.id === activity.task_id)
+      if (task) {
+        task.activities = task.activities ?? []
+        if (!task.activities.find(a => a.id === activity.id)) {
+          task.activities.push(activity)
+        }
+      }
+      if (activeTask.value?.id === activity.task_id) {
+        activeTask.value.activities = activeTask.value.activities ?? []
+        if (!activeTask.value.activities.find(a => a.id === activity.id)) {
+          activeTask.value.activities.push(activity)
+        }
+      }
+    })
+    .listen('CommentAdded', ({ task_id, comment }) => {
+      // Append the comment to the local task and active panel so the
+      // Comments tab and the derived Participants list update live.
+      // TaskPanel watches task.comments.length and reloads participants
+      // from the server, so we don't need to touch participants here.
+      const task = localTasks.value.find(t => t.id === task_id)
+      if (task) {
+        task.comments = task.comments ?? []
+        if (!task.comments.find(c => c.id === comment.id)) {
+          task.comments.push(comment)
+        }
+      }
+      if (activeTask.value?.id === task_id) {
+        activeTask.value.comments = activeTask.value.comments ?? []
+        if (!activeTask.value.comments.find(c => c.id === comment.id)) {
+          activeTask.value.comments.push(comment)
+        }
+      }
+    })
+    .listen('ReplyAdded', ({ task_id, comment_id, reply }) => {
+      const appendReply = (task) => {
+        const comment = (task.comments ?? []).find(c => c.id === comment_id)
+        if (!comment) return
+        comment.replies = comment.replies ?? []
+        if (!comment.replies.find(r => r.id === reply.id)) {
+          comment.replies.push(reply)
+        }
+      }
+      const task = localTasks.value.find(t => t.id === task_id)
+      if (task) appendReply(task)
+      if (activeTask.value?.id === task_id) appendReply(activeTask.value)
     })
 })
 onUnmounted(() => window.Echo.leave(`project.${props.project.id}`))

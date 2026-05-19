@@ -11,7 +11,10 @@ use App\Repositories\TaskRepository;
 
 class TaskService
 {
-    public function __construct(private TaskRepository $repository) {}
+    public function __construct(
+        private TaskRepository $repository,
+        private TaskActivityService $activityService,
+    ) {}
 
     public function update(Task $task, array $data, int $userId): Task
     {
@@ -48,6 +51,8 @@ class TaskService
         $action = $this->resolveAuditAction($task, $data, $assigneeIds, $isBacklogMove);
         $meta   = $this->resolveAuditMeta($task, $data, $assigneeIds, $previousProjectId, $isBacklogMove);
 
+        $before = $this->activityService->snapshot($task);
+
         if (!empty($data)) {
             $this->repository->update($task, $data);
         }
@@ -56,6 +61,11 @@ class TaskService
             $this->repository->syncAssignees($task, $assigneeIds);
             $task->refresh();
         }
+
+        $task->refresh()->load(['project:id,name', 'sprint:id,name']);
+        $after = $this->activityService->snapshot($task, $assigneeIds);
+
+        $this->activityService->recordChanges($task, null, $before, $after, $userId);
 
         AuditLog::create([
             'user_id'    => $userId,
@@ -78,8 +88,10 @@ class TaskService
      */
     public function setAssignees(Task $task, array $userIds, int $actingUserId): Task
     {
-        $previous = $task->assignees()->pluck('users.id')->all();
+        $before = $this->activityService->snapshot($task);
         $this->repository->syncAssignees($task, $userIds);
+        $task->refresh();
+        $after = $this->activityService->snapshot($task, $userIds);
 
         AuditLog::create([
             'user_id'    => $actingUserId,
@@ -87,10 +99,12 @@ class TaskService
             'task_id'    => $task->id,
             'action'     => 'task.assigned',
             'meta'       => [
-                'assignee_ids'          => $task->assignees()->pluck('users.id')->all(),
-                'previous_assignee_ids' => $previous,
+                'assignee_ids'          => $after['assignee_ids'],
+                'previous_assignee_ids' => $before['assignee_ids'],
             ],
         ]);
+
+        $this->activityService->recordChanges($task, null, $before, $after, $actingUserId);
 
         return $task->refresh();
     }
@@ -131,6 +145,8 @@ class TaskService
             unset($data['assignee_ids']);
         }
 
+        $before = $this->activityService->snapshot($subtask);
+
         if (!empty($data)) {
             $this->repository->updateSubtask($subtask, $data);
         }
@@ -139,6 +155,11 @@ class TaskService
             $this->repository->syncAssignees($subtask, $assigneeIds);
             $subtask->refresh();
         }
+
+        $subtask->refresh()->load(['project:id,name', 'sprint:id,name']);
+        $after = $this->activityService->snapshot($subtask, $assigneeIds);
+
+        $this->activityService->recordChanges($parent, $subtask, $before, $after, $userId);
 
         $changes = array_keys($data);
         if ($assigneeIds !== null) $changes[] = 'assignee_ids';

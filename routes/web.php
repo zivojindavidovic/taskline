@@ -75,6 +75,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Comments & replies
     Route::post('/tasks/{task}/comments', [TaskCommentController::class, 'store'])->name('tasks.comments.store');
     Route::post('/tasks/{task}/comments/{comment}/replies', [TaskCommentController::class, 'reply'])->name('tasks.comments.reply');
+    Route::get('/tasks/{task}/comments/mentionable-users', [TaskCommentController::class, 'mentionableUsers'])->name('tasks.comments.mentionable');
 
     // Sprints
     Route::post('/projects/{project}/sprints', [SprintController::class, 'store'])->name('sprints.store');

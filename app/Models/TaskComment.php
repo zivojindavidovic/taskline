@@ -24,4 +24,15 @@ class TaskComment extends Model
     {
         return $this->hasMany(CommentReply::class)->oldest();
     }
+
+    public function mentions(): HasMany
+    {
+        return $this->hasMany(CommentMention::class);
+    }
+
+    public function mentionedUsers()
+    {
+        return $this->belongsToMany(User::class, 'comment_mentions', 'task_comment_id', 'user_id')
+            ->withTimestamps();
+    }
 }

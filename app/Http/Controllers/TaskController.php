@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\TaskCreated;
 use App\Models\Project;
 use App\Models\Sprint;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Services\ParticipantService;
+use App\Services\TaskActivityService;
 use App\Services\TaskService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -21,6 +23,7 @@ class TaskController extends Controller
     public function __construct(
         private TaskService $taskService,
         private ParticipantService $participantService,
+        private TaskActivityService $activityService,
     ) {}
 
     public function store(Request $request): RedirectResponse
@@ -92,6 +95,14 @@ class TaskController extends Controller
             'meta'       => ['title' => $task->title],
         ]);
 
+        $task->refresh()->load([
+            'assignee:id,name,email,avatar_color',
+            'assignees:id,name,email,avatar_color',
+            'boardColumn:id,name,color',
+            'sprint:id,name,status',
+        ]);
+        broadcast(new TaskCreated($task))->toOthers();
+
         return back()->with('success', "Task {$task->key} created.");
     }
 
@@ -149,6 +160,7 @@ class TaskController extends Controller
 
     public function complete(Task $task): RedirectResponse
     {
+        $wasCompleted = (bool) $task->completed;
         $task->update([
             'completed'    => true,
             'completed_at' => now(),
@@ -162,11 +174,14 @@ class TaskController extends Controller
             'action'     => 'task.completed',
         ]);
 
+        $this->activityService->recordStatusChange($task, $wasCompleted, true, auth()->id());
+
         return back()->with('success', 'Task marked as completed.');
     }
 
     public function uncomplete(Task $task): RedirectResponse
     {
+        $wasCompleted = (bool) $task->completed;
         $task->update([
             'completed'    => false,
             'completed_at' => null,
@@ -179,6 +194,8 @@ class TaskController extends Controller
             'task_id'    => $task->id,
             'action'     => 'task.reopened',
         ]);
+
+        $this->activityService->recordStatusChange($task, $wasCompleted, false, auth()->id());
 
         return back();
     }
