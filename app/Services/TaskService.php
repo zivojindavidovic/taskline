@@ -184,8 +184,16 @@ class TaskService
         return $subtask;
     }
 
-    public function delete(Task $task): void
+    public function delete(Task $task, int $userId): void
     {
+        AuditLog::create([
+            'user_id'    => $userId,
+            'project_id' => $task->project_id,
+            'task_id'    => null,
+            'action'     => 'task.deleted',
+            'meta'       => ['key' => $task->key, 'title' => $task->title],
+        ]);
+
         $this->repository->delete($task);
     }
 

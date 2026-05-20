@@ -248,7 +248,7 @@ class TaskController extends Controller
     {
         $this->authorizeTaskAccess($task);
         $key = $task->key;
-        $this->taskService->delete($task);
+        $this->taskService->delete($task, auth()->id());
 
         return back()->with('success', "Task {$key} deleted.");
     }

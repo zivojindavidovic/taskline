@@ -23,6 +23,13 @@ class SprintController extends Controller
 
         $sprint = $project->sprints()->create([...$data, 'status' => 'planned']);
 
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'project_id' => $project->id,
+            'action'     => 'sprint.created',
+            'meta'       => ['sprint' => $sprint->name],
+        ]);
+
         return back()->with('success', "Sprint \"{$sprint->name}\" created.");
     }
 

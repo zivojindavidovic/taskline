@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\BoardColumn;
 use App\Models\Project;
 use Illuminate\Http\RedirectResponse;
@@ -17,10 +18,17 @@ class BoardColumnController extends Controller
         ]);
 
         $position = $project->boardColumns()->max('position') + 1;
-        $project->boardColumns()->create([
+        $column = $project->boardColumns()->create([
             'name'     => $data['name'],
             'color'    => $data['color'] ?? '#94948c',
             'position' => $position,
+        ]);
+
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'project_id' => $project->id,
+            'action'     => 'column.created',
+            'meta'       => ['column' => $column->name],
         ]);
 
         return back()->with('success', "Column \"{$data['name']}\" added.");
@@ -33,7 +41,17 @@ class BoardColumnController extends Controller
             'color' => 'sometimes|string|max:7',
         ]);
 
+        $previousName = $column->name;
         $column->update($data);
+
+        if (isset($data['name']) && $data['name'] !== $previousName) {
+            AuditLog::create([
+                'user_id'    => auth()->id(),
+                'project_id' => $column->project_id,
+                'action'     => 'column.renamed',
+                'meta'       => ['from' => $previousName, 'to' => $column->name],
+            ]);
+        }
 
         return back();
     }
@@ -44,8 +62,16 @@ class BoardColumnController extends Controller
             return back()->withErrors(['column' => 'Cannot delete a column that contains tasks.']);
         }
 
-        $name = $column->name;
+        $name      = $column->name;
+        $projectId = $column->project_id;
         $column->delete();
+
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'project_id' => $projectId,
+            'action'     => 'column.deleted',
+            'meta'       => ['column' => $name],
+        ]);
 
         return back()->with('success', "Column \"{$name}\" removed.");
     }
