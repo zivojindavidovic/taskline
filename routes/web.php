@@ -70,6 +70,7 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::post('/tasks/{task}/subtasks', [TaskController::class, 'storeSubtask'])->name('tasks.subtasks.store');
     Route::patch('/tasks/{task}/subtasks/{subtask}', [TaskController::class, 'updateSubtask'])->name('tasks.subtasks.update');
     Route::get('/tasks/{task}/participants', [TaskController::class, 'participants'])->name('tasks.participants');
+    Route::get('/tasks/{task}/details', [TaskController::class, 'details'])->name('tasks.details');
     Route::post('/tasks/{task}/attachments', [TaskAttachmentController::class, 'store'])->name('tasks.attachments.store');
     Route::delete('/attachments/{attachment}', [TaskAttachmentController::class, 'destroy'])->name('attachments.destroy');
 

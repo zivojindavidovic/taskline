@@ -65,14 +65,17 @@
         </div>
       </div>
     </div>
+
+    <GlobalTaskPanel :task-id="activeTaskId" @close="activeTaskId = null" />
   </AppLayout>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
+import GlobalTaskPanel from '@/Components/Task/GlobalTaskPanel.vue'
 import { CheckIcon, UserIcon, ArrowRightIcon } from '@/Components/UI/Icons.vue'
 
 const props = defineProps({
@@ -103,10 +106,10 @@ const statsCards = computed(() => [
   { label: 'Completed this sprint', value: props.stats.completedSprint ?? 0, delta: props.stats.sprintDelta ?? '' },
 ])
 
+const activeTaskId = ref(null)
+
 function openTask(task) {
-  if (task.project_id) {
-    window.location.href = route('projects.show', task.project_id) + '?task=' + task.id
-  }
+  activeTaskId.value = task.id
 }
 
 function viewAllTasks() {

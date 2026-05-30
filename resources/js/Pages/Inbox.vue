@@ -42,22 +42,27 @@
         </p>
       </div>
     </div>
+
+    <GlobalTaskPanel :task-id="activeTaskId" @close="activeTaskId = null" />
   </AppLayout>
 </template>
 
 <script setup>
-import { router } from '@inertiajs/vue3'
+import { ref } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Avatar from '@/Components/UI/Avatar.vue'
+import GlobalTaskPanel from '@/Components/Task/GlobalTaskPanel.vue'
 import { InboxIcon } from '@/Components/UI/Icons.vue'
 
 const props = defineProps({
   notifications: { type: Array, default: () => [] },
 })
 
+const activeTaskId = ref(null)
+
 function openNotification(n) {
-  if (n.task_id && n.project_id) {
-    router.visit(route('projects.show', n.project_id) + '?task=' + n.task_id)
+  if (n.task_id) {
+    activeTaskId.value = n.task_id
   }
 }
 </script>
