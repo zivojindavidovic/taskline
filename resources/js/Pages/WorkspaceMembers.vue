@@ -6,15 +6,74 @@
       <div class="page-header">
         <div class="page-header-row">
           <h2 class="page-title">Members</h2>
-          <span class="page-meta">{{ localMembers.length }} member{{ localMembers.length !== 1 ? 's' : '' }} · {{ localPending.length }} pending</span>
+          <span class="page-meta">{{ localMembers.length }} member{{ localMembers.length !== 1 ? 's' : '' }}<template v-if="!selfHosted"> · {{ localPending.length }} pending</template></span>
         </div>
-        <p class="page-desc">Manage who has access to <strong>{{ workspace?.name }}</strong>.</p>
+        <p class="page-desc">
+          Manage who has access to <strong>{{ workspace?.name }}</strong>.
+          <template v-if="selfHosted">New members are created instantly with a generated password — no email invite needed.</template>
+        </p>
       </div>
 
-      <!-- Invite form (owner only) -->
+      <!-- Just-created credential (self-hosted only, shown once) -->
+      <div v-if="selfHosted && createdCred" class="list-card cred-card">
+        <div class="cred-head">
+          <LockIcon class="cred-icon" />
+          <div class="cred-head-text">
+            <div class="cred-title">Account created for {{ createdCred.name }}</div>
+            <div class="cred-sub">Share this password securely — it won't be shown again.</div>
+          </div>
+          <button type="button" class="cred-dismiss" @click="createdCred = null">Dismiss</button>
+        </div>
+        <div class="cred-row">
+          <div class="cred-value">{{ createdCred.email }} · {{ createdCred.password }}</div>
+          <button type="button" class="cred-copy" @click="copyCred">{{ copied ? 'Copied' : 'Copy' }}</button>
+        </div>
+      </div>
+
+      <!-- Add member (self-hosted) / Invite by email (cloud) — owner only -->
       <div v-if="isOwner" class="list-card invite-card">
-        <div class="invite-label">Invite by email</div>
-        <form @submit.prevent="submitInvite" class="invite-form">
+        <div class="invite-label">{{ selfHosted ? 'Add a member' : 'Invite by email' }}</div>
+
+        <!-- Self-hosted: create account directly -->
+        <form v-if="selfHosted" @submit.prevent="submitAdd" class="invite-form">
+          <input
+            v-model="addForm.name"
+            type="text"
+            placeholder="Full name (optional)"
+            class="field-input name-input"
+          />
+          <div class="invite-email-col">
+            <input
+              v-model="addForm.email"
+              type="email"
+              placeholder="name@northstarlabs.local"
+              class="field-input"
+              :class="{ 'field-input--error': addForm.errors.email }"
+            />
+            <span v-if="addForm.errors.email" class="field-error">{{ addForm.errors.email }}</span>
+          </div>
+          <select v-model="addForm.role" class="field-input role-select">
+            <option value="admin">Admin</option>
+            <option value="member">Member</option>
+            <option value="viewer">Viewer</option>
+          </select>
+          <div class="invite-access">
+            <ProjectAccessControl
+              v-model="addForm.projects"
+              :projects="projects"
+              aria-label="Project access for new member"
+            />
+          </div>
+          <button type="submit" class="btn-send-invite" :disabled="addForm.processing">
+            <svg v-if="addForm.processing" class="spinner" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+            </svg>
+            {{ addForm.processing ? 'Adding…' : 'Add member' }}
+          </button>
+        </form>
+
+        <!-- Cloud: invite by email -->
+        <form v-else @submit.prevent="submitInvite" class="invite-form">
           <div class="invite-email-col">
             <input
               v-model="inviteForm.email"
@@ -44,13 +103,15 @@
             {{ inviteForm.processing ? 'Sending…' : 'Send invite' }}
           </button>
         </form>
+
         <div class="invite-hint">
-          Choose which projects this teammate can see. You can change access at any time.
+          <template v-if="selfHosted">A password is generated automatically and the account is active immediately. Choose which projects they can see.</template>
+          <template v-else>Choose which projects this teammate can see. You can change access at any time.</template>
         </div>
       </div>
 
       <!-- Current members -->
-      <div class="list-card" :style="{ marginBottom: pending.length ? '20px' : '0' }">
+      <div class="list-card" :style="{ marginBottom: (!selfHosted && localPending.length) ? '20px' : '0' }">
         <div class="head">
           <UsersIcon class="head-icon" />
           <span class="title">Current members</span>
@@ -121,8 +182,8 @@
         </div>
       </div>
 
-      <!-- Pending invitations -->
-      <div v-if="localPending.length > 0" class="list-card">
+      <!-- Pending invitations — cloud only; self-hosted accounts are active immediately -->
+      <div v-if="!selfHosted && localPending.length > 0" class="list-card">
         <div class="head">
           <InboxIcon class="head-icon" />
           <span class="title">Pending invitations</span>
@@ -165,7 +226,7 @@ import Avatar from '@/Components/UI/Avatar.vue'
 import DropdownMenu from '@/Components/UI/DropdownMenu.vue'
 import MenuItem from '@/Components/UI/MenuItem.vue'
 import ProjectAccessControl from '@/Components/UI/ProjectAccessControl.vue'
-import { UsersIcon, InboxIcon, CheckIcon } from '@/Components/UI/Icons.vue'
+import { UsersIcon, InboxIcon, CheckIcon, LockIcon } from '@/Components/UI/Icons.vue'
 
 const ROLE_STYLES = {
   owner:  { bg: 'color-mix(in oklab, var(--accent) 12%, var(--bg-panel))', fg: 'var(--accent)' },
@@ -207,6 +268,7 @@ const props = defineProps({
 
 const page      = usePage()
 const workspace = computed(() => page.props.workspace)
+const selfHosted = computed(() => page.props.deployment?.mode === 'self-hosted')
 
 const allProjectIds = computed(() => props.projects.map(p => p.id))
 
@@ -256,6 +318,37 @@ function submitInvite() {
     onSuccess: () => inviteForm.reset('email', 'role').setData('projects', [...allProjectIds.value]),
     preserveScroll: true,
   })
+}
+
+// --- Self-hosted: add account directly with a generated password ---
+const addForm = useForm({
+  name:     '',
+  email:    '',
+  role:     'member',
+  projects: [...allProjectIds.value],
+})
+
+function submitAdd() {
+  addForm.post(route('settings.members.add'), {
+    onSuccess: () => addForm.reset('name', 'email').setData('projects', [...allProjectIds.value]),
+    preserveScroll: true,
+  })
+}
+
+// One-time credential reveal, captured from the flash so it survives until dismissed.
+const createdCred = ref(page.props.flash?.createdCred ?? null)
+const copied      = ref(false)
+
+watch(() => page.props.flash?.createdCred, (cred) => {
+  if (cred) { createdCred.value = cred; copied.value = false }
+})
+
+function copyCred() {
+  if (!createdCred.value) return
+  try {
+    navigator.clipboard?.writeText(`${createdCred.value.email}  ${createdCred.value.password}`)
+    copied.value = true
+  } catch (e) { /* clipboard unavailable */ }
 }
 
 function updateRole(member, role) {
@@ -376,6 +469,87 @@ function updatePendingAccess(invite, projectIds) {
   font-size: 11px;
   color: var(--fg-subtle);
 }
+
+.name-input {
+  width: 160px;
+  flex: 0 0 auto;
+}
+
+/* Generated-credential reveal (self-hosted) */
+.cred-card {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 5%, var(--bg-panel));
+}
+.cred-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cred-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.cred-head-text {
+  flex: 1;
+  min-width: 0;
+}
+.cred-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.cred-sub {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.cred-dismiss {
+  border: none;
+  background: transparent;
+  color: var(--fg-subtle);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--r-sm);
+}
+.cred-dismiss:hover { background: var(--bg-hover); color: var(--fg); }
+.cred-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.cred-value {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 8px 10px;
+  background: var(--bg-sunken);
+  border: 1px dashed var(--border-strong, var(--border));
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cred-copy {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--fg);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 80ms;
+}
+.cred-copy:hover { background: var(--bg-hover); }
 
 .field-input {
   height: 36px;

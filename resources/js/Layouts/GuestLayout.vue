@@ -11,11 +11,30 @@
         <slot />
       </div>
     </div>
+
+    <!-- Detected deployment (read-only) -->
+    <div
+      v-if="deployment"
+      class="deploy-pill"
+      :class="{ 'is-cloud': deployment.mode === 'cloud' }"
+      :title="deployment.mode === 'cloud'
+        ? 'Hosted Taskline Cloud'
+        : 'Self-hosted Taskline instance'"
+    >
+      <span class="dp-dot" />
+      <svg v-if="deployment.mode === 'cloud'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+      <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+      <span>{{ deployment.mode === 'cloud' ? 'Cloud' : 'Self-hosted' }} · <code>{{ deployment.host }}</code></span>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { usePage } from '@inertiajs/vue3'
+
+const page = usePage()
+const deployment = computed(() => page.props.deployment ?? null)
 
 const dark = ref(false)
 
@@ -146,4 +165,25 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: var(--font-ui); f
   transition: background 80ms;
 }
 .theme-btn:hover { background: var(--bg-hover); color: var(--fg); }
+
+.deploy-pill {
+  position: fixed;
+  bottom: 14px; left: 14px;
+  z-index: 10;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  box-shadow: 0 1px 2px rgba(20,20,17,0.04);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.deploy-pill .dp-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--status-done);
+  flex-shrink: 0;
+}
+.deploy-pill.is-cloud .dp-dot { background: var(--accent); }
+.deploy-pill code { font-family: var(--font-mono); font-size: 11.5px; color: var(--fg); }
 </style>

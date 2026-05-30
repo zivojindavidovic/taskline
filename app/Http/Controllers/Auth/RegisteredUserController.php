@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\Deployment;
+use App\Support\EmailOtp;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,6 +29,13 @@ class RegisteredUserController extends Controller
     /**
      * Handle an incoming registration request.
      *
+     * Registration no longer auto-creates a workspace or jumps to the
+     * dashboard. Instead it starts the guided onboarding flow, which branches
+     * on the detected deployment (mirrors the auth.html prototype):
+     *
+     *   Cloud:        register -> verify email (OTP) -> gate -> workspace -> done
+     *   Self-hosted:  register (admin) -> workspace -> team accounts -> done
+     *
      * @throws ValidationException
      */
     public function store(Request $request): RedirectResponse
@@ -43,23 +52,34 @@ class RegisteredUserController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
-        // Create a default workspace for the new user
-        $workspace = \App\Models\Workspace::create([
-            'name'     => $request->name . "'s Workspace",
-            'color'    => '#4f46e5',
-            'owner_id' => $user->id,
-        ]);
-        $workspace->users()->attach($user->id, ['role' => 'owner']);
-        $user->update(['current_workspace_id' => $workspace->id]);
+        $mode = Deployment::mode($request);
+
+        // Self-hosted has no email infrastructure to lean on — the first admin
+        // account is trusted immediately, so we skip the verification step.
+        if ($mode === 'self-hosted') {
+            $user->forceFill(['email_verified_at' => now()])->save();
+        }
 
         event(new Registered($user));
 
         Auth::login($user);
 
+        // Arrived via an invitation link: the invite proves the email is theirs,
+        // so honour it directly (this also lands them inside a workspace).
         if ($token = $request->session()->pull('pending_invitation_token')) {
+            if (! $user->email_verified_at) {
+                $user->forceFill(['email_verified_at' => now()])->save();
+            }
+
             return redirect()->route('invitations.accept', ['token' => $token]);
         }
 
-        return redirect(route('dashboard', absolute: false));
+        if ($mode === 'cloud') {
+            EmailOtp::send($user);
+
+            return redirect()->route('onboarding.verify');
+        }
+
+        return redirect()->route('onboarding.workspace');
     }
 }

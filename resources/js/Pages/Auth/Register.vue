@@ -1,7 +1,14 @@
 <script setup>
 import GuestLayout from '@/Layouts/GuestLayout.vue'
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import { ref, computed, watch } from 'vue'
+
+const page = usePage()
+
+// Cloud vs Self-hosted is resolved server-side and shared via Inertia.
+const deployment = computed(() => page.props.deployment ?? { mode: 'cloud', host: '' })
+const selfHosted = computed(() => deployment.value.mode === 'self-hosted')
+const host = computed(() => deployment.value.host)
 
 const form = useForm({
   name: '',
@@ -46,7 +53,7 @@ const submit = () => {
 
 <template>
   <GuestLayout>
-    <Head title="Create account" />
+    <Head :title="selfHosted ? 'Create admin account' : 'Create account'" />
 
     <!-- Brand -->
     <div class="auth-brand">
@@ -54,21 +61,41 @@ const submit = () => {
       <span class="brand-name">Taskline</span>
     </div>
 
-    <h1 class="auth-title">Create your account</h1>
-    <p class="auth-subtitle">Start organizing your team's work — free, no card needed.</p>
+    <!-- Self-hosted setup is a guided first-run, so show the progress rail -->
+    <div v-if="selfHosted" class="step-bar">
+      <span class="step-seg is-active" />
+      <span class="step-seg" />
+      <span class="step-seg" />
+      <span class="step-label">Step 1 of 3</span>
+    </div>
 
-    <!-- Google SSO (visual only) -->
-    <button type="button" class="btn-sso">
-      <svg width="18" height="18" viewBox="0 0 18 18">
-        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
-        <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
-        <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-      </svg>
-      Sign up with Google
-    </button>
+    <h1 class="auth-title">
+      {{ selfHosted ? 'Create your admin account' : 'Create your account' }}
+    </h1>
+    <p class="auth-subtitle">
+      <template v-if="selfHosted">
+        You'll be the <strong>admin</strong> of this self-hosted Taskline on
+        <code class="host-code">{{ host }}</code>. Next, you'll set up your workspace.
+      </template>
+      <template v-else>
+        Start organizing your team's work — free, no card needed.
+      </template>
+    </p>
 
-    <div class="divider">or with email</div>
+    <!-- Google SSO — Cloud only (visual only) -->
+    <template v-if="!selfHosted">
+      <button type="button" class="btn-sso">
+        <svg width="18" height="18" viewBox="0 0 18 18">
+          <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+          <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+          <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+          <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+        </svg>
+        Sign up with Google
+      </button>
+
+      <div class="divider">or with email</div>
+    </template>
 
     <form @submit.prevent="submit" class="auth-form">
       <!-- Full name -->
@@ -161,7 +188,9 @@ const submit = () => {
         :disabled="form.processing || !agreedToTerms"
       >
         <svg v-if="form.processing" class="spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-        {{ form.processing ? 'Creating account…' : 'Create account' }}
+        {{ form.processing
+            ? (selfHosted ? 'Creating admin account…' : 'Creating account…')
+            : (selfHosted ? 'Create admin account' : 'Create account') }}
       </button>
     </form>
 
@@ -185,6 +214,25 @@ const submit = () => {
 .brand-name { font-size: 16px; font-weight: 600; color: var(--fg); }
 .auth-title { font-size: 20px; font-weight: 600; color: var(--fg); margin: 0 0 6px; line-height: 1.3; }
 .auth-subtitle { font-size: 14px; color: var(--fg-muted); margin: 0 0 28px; line-height: 1.5; }
+.auth-subtitle strong { color: var(--fg); font-weight: 600; }
+.host-code {
+  font-family: var(--font-mono); font-size: 0.92em;
+  color: var(--fg); background: var(--bg-sunken);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 1px 5px;
+}
+
+/* Self-hosted first-run progress rail */
+.step-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 24px; }
+.step-seg {
+  height: 3px; flex: 1; border-radius: 2px;
+  background: var(--border); transition: background 200ms;
+}
+.step-seg.is-active { background: var(--accent); }
+.step-label {
+  font-size: 11px; color: var(--fg-subtle);
+  margin-left: 4px; white-space: nowrap;
+}
 
 .btn-sso {
   width: 100%; height: 40px; border-radius: var(--r-md);

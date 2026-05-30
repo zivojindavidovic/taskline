@@ -23,7 +23,7 @@ Route::get('/', fn () => redirect()->route('dashboard'));
 // Invitation accept (auth-optional — controller decides what to do for guests vs users)
 Route::get('/invitations/{token}', [InvitationAcceptController::class, 'show'])->name('invitations.accept');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/inbox', [InboxController::class, 'index'])->name('inbox');
     Route::get('/my-tasks', [TaskController::class, 'myTasks'])->name('my-tasks');
@@ -35,6 +35,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/settings/workspace', [SettingsController::class, 'updateWorkspace'])->name('settings.workspace.update');
     Route::delete('/settings/workspace', [SettingsController::class, 'destroyWorkspace'])->name('settings.workspace.destroy');
     Route::post('/settings/members/invite', [WorkspaceMembersController::class, 'invite'])->name('settings.members.invite');
+    Route::post('/settings/members/add', [WorkspaceMembersController::class, 'addMember'])->name('settings.members.add');
     Route::patch('/settings/members/{member}/role', [WorkspaceMembersController::class, 'updateRole'])->name('settings.members.role');
     Route::patch('/settings/members/{member}/projects', [WorkspaceMembersController::class, 'updateProjectAccess'])->name('settings.members.projects');
     Route::delete('/settings/members/{member}', [WorkspaceMembersController::class, 'remove'])->name('settings.members.remove');

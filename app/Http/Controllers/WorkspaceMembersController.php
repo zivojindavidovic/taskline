@@ -9,15 +9,19 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use App\Services\InvitationService;
+use App\Support\Deployment;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class WorkspaceMembersController extends Controller
 {
+    private const COLORS = ['#4f46e5', '#0891b2', '#16a34a', '#7c3aed', '#d97706', '#dc2626', '#0d9488'];
+
     public function __construct(private InvitationService $invitations) {}
 
     public function index(Request $request): Response
@@ -94,6 +98,10 @@ class WorkspaceMembersController extends Controller
 
     public function invite(InviteMemberRequest $request): RedirectResponse
     {
+        // Email invitations are a Cloud-only flow. Self-hosted instances create
+        // accounts directly (see addMember) — there is no mail/invite pipeline.
+        abort_if(Deployment::isSelfHosted($request), 404);
+
         $user      = $request->user();
         $workspace = $user->currentWorkspace;
         $data      = $request->validated();
@@ -111,6 +119,79 @@ class WorkspaceMembersController extends Controller
         }
 
         return back()->with('success', "Invitation sent to {$data['email']}.");
+    }
+
+    /**
+     * Self-hosted only: create a member account directly, with a generated
+     * password, active immediately — no email verification, no pending invite.
+     * Mirrors the self-hosted team-account step of onboarding.
+     */
+    public function addMember(Request $request): RedirectResponse
+    {
+        abort_unless(Deployment::isSelfHosted($request), 404);
+
+        $user      = $request->user();
+        $workspace = $user->currentWorkspace;
+
+        abort_unless($workspace && $workspace->owner_id === $user->id, 403);
+
+        $data = $request->validate([
+            'name'       => ['nullable', 'string', 'max:255'],
+            'email'      => ['required', 'email', 'max:255'],
+            'role'       => ['required', 'in:admin,member,viewer'],
+            'projects'   => ['sometimes', 'array'],
+            'projects.*' => ['integer'],
+        ]);
+
+        $email = strtolower(trim($data['email']));
+
+        if (User::whereRaw('LOWER(email) = ?', [$email])->exists()) {
+            throw ValidationException::withMessages([
+                'email' => 'Someone with this email already has an account.',
+            ]);
+        }
+
+        $password    = $this->generatePassword();
+        $projectIds  = $this->sanitizeProjectIds($workspace, $data['projects'] ?? []) ?? [];
+        $created     = null;
+
+        DB::transaction(function () use ($data, $email, $password, $workspace, $projectIds, &$created) {
+            $member = User::create([
+                'name'         => $data['name'] ?: explode('@', $email)[0],
+                'email'        => $email,
+                'password'     => Hash::make($password),
+                'avatar_color' => self::COLORS[array_rand(self::COLORS)],
+            ]);
+            // No email verification on self-hosted instances.
+            $member->forceFill(['email_verified_at' => now()])->save();
+
+            $workspace->users()->syncWithoutDetaching([
+                $member->id => ['role' => $data['role']],
+            ]);
+
+            // Grant the selected per-project access immediately.
+            if ($projectIds) {
+                $projectRole = $data['role'] === 'admin' ? 'admin' : 'member';
+                $rows = array_map(fn ($pid) => [
+                    'project_id' => $pid,
+                    'user_id'    => $member->id,
+                    'role'       => $projectRole,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ], $projectIds);
+                DB::table('workspace_members')->insert($rows);
+            }
+
+            $created = [
+                'name'     => $member->name,
+                'email'    => $member->email,
+                'password' => $password,
+            ];
+        });
+
+        return back()
+            ->with('success', "{$created['name']} added.")
+            ->with('createdCred', $created);
     }
 
     public function revoke(Request $request, int $invitation): RedirectResponse
@@ -248,6 +329,22 @@ class WorkspaceMembersController extends Controller
         ))->toOthers();
 
         return back()->with('success', 'Invitation updated.');
+    }
+
+    /**
+     * Readable, unambiguous password (no 0/O/1/l/I) — mirrors the self-hosted
+     * account generation in the prototype (genMemberPassword).
+     */
+    private function generatePassword(int $len = 14): string
+    {
+        $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+        $max   = strlen($chars) - 1;
+        $out   = '';
+        for ($i = 0; $i < $len; $i++) {
+            $out .= $chars[random_int(0, $max)];
+        }
+
+        return $out;
     }
 
     /**

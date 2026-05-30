@@ -18,7 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        //
+        // Pushes not-yet-onboarded users into the correct onboarding step.
+        $middleware->alias([
+            'onboarded' => \App\Http\Middleware\EnsureOnboarded::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

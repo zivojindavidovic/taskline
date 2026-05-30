@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Deployment;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -56,6 +57,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $user,
             ],
+            'deployment' => Deployment::resolve($request),
             'workspace'  => $workspace ? $workspace->only(['id', 'name', 'color', 'owner_id']) : null,
             'workspaces' => $workspaces,
             'projects' => $user
@@ -81,9 +83,12 @@ class HandleInertiaRequests extends Middleware
                     ->count()
                 : 0,
             'flash' => [
-                'success' => $request->session()->get('success'),
-                'error'   => $request->session()->get('error'),
+                'success'     => $request->session()->get('success'),
+                'error'       => $request->session()->get('error'),
+                // One-time credential reveal after a self-hosted account is created.
+                'createdCred' => $request->session()->get('createdCred'),
             ],
         ];
     }
+
 }

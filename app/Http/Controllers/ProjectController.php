@@ -36,6 +36,16 @@ class ProjectController extends Controller
             'workspace_id' => $user->current_workspace_id,
         ]);
 
+        // The workspace owner always gets immediate access (as admin) to any
+        // project created by another member — so projects created by non-owner
+        // members are never invisible to the workspace owner.
+        $workspaceOwnerId = $user->currentWorkspace?->owner_id;
+        if ($workspaceOwnerId && $workspaceOwnerId !== $user->id) {
+            $project->members()->syncWithoutDetaching([
+                $workspaceOwnerId => ['role' => 'admin'],
+            ]);
+        }
+
         // Default columns
         foreach ([
             ['name' => 'Todo',        'color' => '#94948c', 'position' => 0],
