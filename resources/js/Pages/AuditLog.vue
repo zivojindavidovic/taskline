@@ -6,26 +6,20 @@
       <div class="audit-header">
         <h2 class="audit-title">Audit log</h2>
         <p class="audit-sub">
-          Every change across the workspace, in order. Audit by default — trust requires receipts.
+          Every change across the workspace, in order. Filter by project, person, or action — coming soon.
         </p>
       </div>
 
       <!-- Filter bar -->
       <div class="audit-filters">
         <!-- Project filter -->
-        <button
-          type="button"
-          class="filter-pill"
-          :class="{ 'is-active': filters.project_id !== null }"
-          @click="toggleMenu('project')"
-        >
-          <FilterIcon class="filter-icon" />
-          <span v-if="filters.project_id === null">All projects</span>
-          <template v-else>
+        <button type="button" class="btn secondary sm" @click="toggleMenu('project')">
+          <FilterIcon class="btn-icon" />
+          <template v-if="filters.project_id !== null">
             <span class="project-dot" :style="{ background: selectedProject?.color }" />
-            <span>{{ selectedProject?.name }}</span>
+            <span>{{ selectedProject?.name ?? 'Project' }}</span>
           </template>
-          <ChevronIcon class="filter-chev" />
+          <span v-else>All projects</span>
         </button>
         <div v-if="openMenu === 'project'" v-click-outside="closeMenu" class="filter-menu">
           <button type="button" class="menu-item" :class="{ active: filters.project_id === null }" @click="applyFilter('project_id', null)">
@@ -47,15 +41,9 @@
         </div>
 
         <!-- Person filter -->
-        <button
-          type="button"
-          class="filter-pill"
-          :class="{ 'is-active': filters.user_id !== null }"
-          @click="toggleMenu('user')"
-        >
-          <UserIcon class="filter-icon" />
+        <button type="button" class="btn secondary sm" @click="toggleMenu('user')">
+          <UserIcon class="btn-icon" />
           <span>{{ selectedUser?.name ?? 'Anyone' }}</span>
-          <ChevronIcon class="filter-chev" />
         </button>
         <div v-if="openMenu === 'user'" v-click-outside="closeMenu" class="filter-menu">
           <button type="button" class="menu-item" :class="{ active: filters.user_id === null }" @click="applyFilter('user_id', null)">
@@ -76,15 +64,9 @@
         </div>
 
         <!-- Range filter -->
-        <button
-          type="button"
-          class="filter-pill"
-          :class="{ 'is-active': filters.range !== '7d' }"
-          @click="toggleMenu('range')"
-        >
-          <CalendarIcon class="filter-icon" />
+        <button type="button" class="btn secondary sm" @click="toggleMenu('range')">
+          <CalendarIcon class="btn-icon" />
           <span>{{ rangeLabel }}</span>
-          <ChevronIcon class="filter-chev" />
         </button>
         <div v-if="openMenu === 'range'" v-click-outside="closeMenu" class="filter-menu">
           <button
@@ -98,42 +80,31 @@
             {{ opt.label }}
           </button>
         </div>
-
-        <button
-          v-if="hasActiveFilters"
-          type="button"
-          class="filter-clear"
-          @click="clearFilters"
-        >
-          Clear
-        </button>
       </div>
 
-      <!-- Timeline -->
-      <div v-if="logs.data?.length" class="audit-list">
+      <!-- Feed -->
+      <div v-if="logs.data?.length" class="list-card">
         <div
-          v-for="(log, i) in logs.data"
+          v-for="log in logs.data"
           :key="log.id"
-          class="audit-row"
+          class="task-row audit-event"
         >
-          <div class="dot-col">
-            <span class="dot" :style="dotStyle(log)" />
-            <span v-if="i < logs.data.length - 1" class="line" />
-          </div>
+          <Avatar :name="log.user?.name ?? 'Someone'" :color="log.user?.avatar_color || null" size="sm" />
 
-          <div class="text">
-            <span class="actor">{{ log.user?.name ?? 'Someone' }}</span>
-            <component :is="'span'" v-html="describe(log)" />
-          </div>
-
-          <div class="meta">
-            <span v-if="log.project" class="project-chip">
-              <span class="project-dot" :style="{ background: log.project.color }" />
-              {{ log.project.name }}
-            </span>
-            <span class="time" :title="absoluteTime(log.created_at)">
-              {{ relativeTime(log.created_at) }}
-            </span>
+          <div class="event-body">
+            <p class="event-text">
+              <strong>{{ log.user?.name ?? 'Someone' }}</strong><span v-html="describe(log)" />
+            </p>
+            <div class="event-meta">
+              <span class="time" :title="absoluteTime(log.created_at)">{{ relativeTime(log.created_at) }}</span>
+              <template v-if="log.project">
+                <span class="sep">·</span>
+                <span class="proj">
+                  <span class="proj-dot" :style="{ background: log.project.color }" />
+                  {{ log.project.name }}
+                </span>
+              </template>
+            </div>
           </div>
         </div>
       </div>
@@ -182,7 +153,7 @@ import { router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Avatar from '@/Components/UI/Avatar.vue'
 import {
-  FilterIcon, UserIcon, CalendarIcon, ChevronIcon,
+  FilterIcon, UserIcon, CalendarIcon,
   HistoryIcon, ArrowLeftIcon, ArrowRightIcon,
 } from '@/Components/UI/Icons.vue'
 
@@ -218,7 +189,7 @@ const hasActiveFilters = computed(() =>
 
 // ── Action humanization ──────────────────────────────────────────────────
 // Build the trailing phrase after the actor's name. Returns HTML so we can
-// bold task keys and entity names inline.
+// bold task keys and entity names inline (matching the design's flat feed).
 function describe(log) {
   const action = log.action || ''
   const meta   = log.meta || {}
@@ -226,18 +197,18 @@ function describe(log) {
   const taskTitle = log.task?.title
 
   const tk = taskKey
-    ? ` <strong class="mono">${escape(taskKey)}</strong>`
-    : (meta.key ? ` <strong class="mono">${escape(meta.key)}</strong>` : '')
+    ? ` <strong>${escape(taskKey)}</strong>`
+    : (meta.key ? ` <strong>${escape(meta.key)}</strong>` : '')
 
   const tt = taskTitle
-    ? ` <span class="dim">${escape(taskTitle)}</span>`
-    : (meta.title && !taskKey ? ` <span class="dim">${escape(meta.title)}</span>` : '')
+    ? ` ${escape(taskTitle)}`
+    : (meta.title && !taskKey ? ` ${escape(meta.title)}` : '')
 
   switch (action) {
     case 'task.created':           return ` created${tk}${tt}`
     case 'task.completed':         return ` completed${tk}${tt}`
     case 'task.reopened':          return ` reopened${tk}${tt}`
-    case 'task.deleted':           return ` deleted task <strong class="mono">${escape(meta.key ?? '')}</strong> ${meta.title ? `<span class="dim">${escape(meta.title)}</span>` : ''}`
+    case 'task.deleted':           return ` deleted task <strong>${escape(meta.key ?? '')}</strong> ${meta.title ? escape(meta.title) : ''}`
     case 'task.moved':             return ` moved${tk} to <strong>${escape(meta.column ?? '—')}</strong>`
     case 'task.moved_to_backlog':  return ` moved${tk} to backlog`
     case 'task.project_changed':   return ` moved${tk} across projects`
@@ -246,8 +217,8 @@ function describe(log) {
     case 'task.priority_changed':  return ` set priority on${tk} to <strong>${escape(meta.priority ?? '—')}</strong>`
     case 'task.renamed':           return ` renamed${tk}`
     case 'task.tags_updated':      return ` updated tags on${tk}`
-    case 'task.subtask_added':     return ` added subtask <strong class="mono">${escape(meta.subtask_key ?? '')}</strong>${tt} on${tk}`
-    case 'task.subtask_updated':   return ` updated subtask <strong class="mono">${escape(meta.subtask_key ?? '')}</strong> on${tk}`
+    case 'task.subtask_added':     return ` added subtask <strong>${escape(meta.subtask_key ?? '')}</strong>${tt} on${tk}`
+    case 'task.subtask_updated':   return ` updated subtask <strong>${escape(meta.subtask_key ?? '')}</strong> on${tk}`
     case 'task.updated':           return ` updated${tk}`
 
     case 'sprint.created':         return ` created sprint <strong>${escape(meta.sprint ?? '')}</strong>`
@@ -277,16 +248,6 @@ function escape(s) {
   return String(s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-}
-
-// ── Dot color: project tint, status semantics ────────────────────────────
-function dotStyle(log) {
-  const a = log.action || ''
-  if (a === 'task.completed' || a === 'sprint.completed') return { background: 'var(--status-done)' }
-  if (a === 'sprint.locked' || a === 'task.deleted')      return { background: 'var(--status-blocked)' }
-  if (a.startsWith('project.') || a.startsWith('workspace.')) return { background: 'var(--accent)' }
-  if (log.project?.color) return { background: log.project.color }
-  return {}
 }
 
 // ── Time formatting ─────────────────────────────────────────────────────
@@ -327,11 +288,6 @@ function applyFilter(key, value) {
   }, { preserveScroll: true, preserveState: true, replace: true })
 }
 
-function clearFilters() {
-  closeMenu()
-  router.get(route('audit'), {}, { preserveScroll: true, preserveState: true, replace: true })
-}
-
 function changePage(page) {
   router.get(route('audit'), {
     page,
@@ -364,7 +320,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
   padding: var(--s-6) var(--s-8);
   display: flex;
   flex-direction: column;
-  gap: var(--s-5);
+  gap: var(--s-4);
 }
 
 .audit-header { display: flex; flex-direction: column; gap: 2px; }
@@ -378,7 +334,6 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
   font-size: var(--fs-13);
   color: var(--fg-muted);
   margin: 0;
-  max-width: 560px;
 }
 
 /* ── Filter bar ─────────────────────────────────────────────────────── */
@@ -389,46 +344,12 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
   flex-wrap: wrap;
   position: relative;
 }
-
-.filter-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--border);
-  background: var(--bg-panel);
-  color: var(--fg-muted);
-  font-size: var(--fs-13);
-  font-family: var(--font-ui);
-  cursor: pointer;
-  transition: background 80ms, border-color 80ms, color 80ms;
-}
-.filter-pill:hover { background: var(--bg-hover); color: var(--fg); border-color: var(--border-strong); }
-.filter-pill.is-active {
-  color: var(--fg);
-  border-color: var(--border-strong);
-  background: var(--bg-panel);
-}
-.filter-pill .filter-icon  { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.7; }
-.filter-pill .filter-chev  { width: 12px; height: 12px; flex-shrink: 0; opacity: 0.5; }
-.filter-pill .project-dot  { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
-
-.filter-clear {
-  font-size: var(--fs-12);
-  color: var(--fg-subtle);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: var(--r-sm);
-}
-.filter-clear:hover { color: var(--fg); background: var(--bg-hover); }
+.audit-filters .btn-icon { width: 14px; height: 14px; flex-shrink: 0; }
+.audit-filters .project-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 
 .filter-menu {
   position: absolute;
-  top: 34px;
+  top: 32px;
   left: 0;
   min-width: 200px;
   max-height: 320px;
@@ -439,7 +360,6 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
   box-shadow: var(--shadow-md);
   padding: 4px;
   z-index: 20;
-  animation: scale-in 120ms ease-out;
 }
 .filter-menu .menu-item {
   display: flex;
@@ -457,116 +377,37 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 }
 .filter-menu .menu-item:hover  { background: var(--bg-hover); }
 .filter-menu .menu-item.active { background: var(--accent-soft); color: var(--accent); }
-.filter-menu .menu-item.active .project-dot { outline: 1px solid var(--accent-soft); }
 .filter-menu .menu-item .project-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
-.filter-menu .menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
-.filter-menu .menu-empty   { padding: 8px; color: var(--fg-subtle); font-size: var(--fs-12); }
+.filter-menu .menu-empty { padding: 8px; color: var(--fg-subtle); font-size: var(--fs-12); }
 
-/* ── Timeline list ──────────────────────────────────────────────────── */
-.audit-list {
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: var(--s-3) var(--s-5);
-}
-
-/* Mirrors the .audit-row spec in the design system styles.css:
-   24px dot lane, 8px dot, vertical hairline connecting rows. */
-.audit-row {
-  display: flex;
+/* ── Feed (flat list, mirrors the design's .task-row pattern) ───────── */
+.audit-event {
   align-items: flex-start;
-  gap: var(--s-3);
-  padding: var(--s-3) 0;
+  cursor: default;
+}
+.audit-event:hover { background: transparent; }
+
+.event-body { flex: 1; min-width: 0; }
+.event-text {
   font-size: var(--fs-13);
+  color: var(--fg);
+  margin: 0;
   line-height: 1.5;
-}
-
-.audit-row .dot-col {
-  width: 24px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative;
-  align-self: stretch;
-}
-.audit-row .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--border-strong);
-  margin-top: 7px;
-  flex-shrink: 0;
-  z-index: 1;
-  outline: 3px solid var(--bg-panel);
-}
-.audit-row .line {
-  position: absolute;
-  top: 17px;
-  bottom: -12px;
-  left: 50%;
-  width: 1px;
-  background: var(--border);
-  transform: translateX(-50%);
-}
-
-.audit-row .text {
-  flex: 1;
-  min-width: 0;
-  color: var(--fg-muted);
   overflow-wrap: anywhere;
 }
-.audit-row .text .actor {
-  color: var(--fg);
-  font-weight: 600;
-}
-.audit-row .text :deep(strong) {
-  color: var(--fg);
-  font-weight: 600;
-}
-.audit-row .text :deep(strong.mono) {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 500;
-  padding: 1px 5px;
-  background: var(--bg-sunken);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  color: var(--fg);
-  white-space: nowrap;
-}
-.audit-row .text :deep(.dim) {
-  color: var(--fg-muted);
-}
+.event-text :deep(strong) { font-weight: 600; color: var(--fg); }
 
-.audit-row .meta {
+.event-meta {
   display: flex;
   align-items: center;
-  gap: var(--s-3);
-  flex-shrink: 0;
-  padding-top: 4px;
-}
-
-.project-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--fs-12);
-  color: var(--fg-muted);
-  white-space: nowrap;
-}
-.project-chip .project-dot {
-  width: 8px; height: 8px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.audit-row .time {
+  gap: 8px;
+  margin-top: 2px;
   font-size: var(--fs-12);
   color: var(--fg-subtle);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
+.event-meta .time { font-variant-numeric: tabular-nums; }
+.event-meta .proj { display: inline-flex; align-items: center; gap: 4px; }
+.event-meta .proj-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
 /* ── Empty state ────────────────────────────────────────────────────── */
 .audit-empty {
@@ -601,6 +442,5 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 
 @media (max-width: 640px) {
   .audit-page { padding: var(--s-4); }
-  .audit-row .meta { flex-direction: column; align-items: flex-end; gap: 2px; }
 }
 </style>
