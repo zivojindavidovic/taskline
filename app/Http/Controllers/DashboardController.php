@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\Sprint;
 use App\Models\Task;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,7 +23,7 @@ class DashboardController extends Controller
             ->whereIn('project_id', $projectIds)
             ->with(['project', 'boardColumn', 'assignee'])
             ->orderByRaw("CASE priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'med' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
-            ->take(8)
+            ->take(5)
             ->get();
 
         $awaitingCompletion = Task::whereIn('project_id', $projectIds)
@@ -31,14 +32,59 @@ class DashboardController extends Controller
             ->with(['project', 'assignee', 'boardColumn'])
             ->get();
 
+        // In-progress tasks assigned to the current user (delta on the "In progress" card).
+        $inProgressMine = Task::whereIn('project_id', $projectIds)
+            ->where('assignee_id', $user->id)
+            ->whereHas('boardColumn', fn ($q) => $q->where('name', 'In Progress'))
+            ->where('completed', false)
+            ->count();
+
+        // Sprint context for the "Completed this sprint" card.
+        $activeSprintIds = Sprint::whereIn('project_id', $projectIds)
+            ->where('status', 'active')
+            ->pluck('id');
+
+        $completedSprint = $activeSprintIds->isEmpty() ? 0
+            : Task::whereIn('project_id', $projectIds)
+                ->whereIn('sprint_id', $activeSprintIds)
+                ->where('completed', true)
+                ->count();
+
+        // Most recently ended completed sprint per project, for the delta.
+        $lastSprintIds = Sprint::whereIn('project_id', $projectIds)
+            ->where('status', 'completed')
+            ->get(['id', 'project_id', 'end_date'])
+            ->groupBy('project_id')
+            ->map(fn ($g) => $g->sortByDesc('end_date')->first()->id)
+            ->values();
+
+        $completedLastSprint = $lastSprintIds->isEmpty() ? null
+            : Task::whereIn('project_id', $projectIds)
+                ->whereIn('sprint_id', $lastSprintIds)
+                ->where('completed', true)
+                ->count();
+
+        if ($activeSprintIds->isEmpty()) {
+            $sprintDelta = 'no active sprint';
+        } elseif ($completedLastSprint === null) {
+            $sprintDelta = 'first sprint';
+        } else {
+            $d = $completedSprint - $completedLastSprint;
+            $sign = $d > 0 ? '+' : ($d < 0 ? '−' : '±');
+            $sprintDelta = $sign.abs($d).' vs last sprint';
+        }
+
         $stats = [
-            'open'      => Task::whereIn('project_id', $projectIds)->where('completed', false)->count(),
-            'completed' => Task::whereIn('project_id', $projectIds)->where('completed', true)->count(),
-            'inProgress' => Task::whereIn('project_id', $projectIds)
+            'open'           => Task::whereIn('project_id', $projectIds)->where('completed', false)->count(),
+            'inProgress'     => Task::whereIn('project_id', $projectIds)
                 ->whereHas('boardColumn', fn ($q) => $q->where('name', 'In Progress'))
                 ->where('completed', false)
                 ->count(),
-            'awaiting'  => $awaitingCompletion->count(),
+            'awaiting'        => $awaitingCompletion->count(),
+            'projectCount'    => $projectIds->count(),
+            'inProgressMine'  => $inProgressMine,
+            'completedSprint' => $completedSprint,
+            'sprintDelta'     => $sprintDelta,
         ];
 
         $mapTask = fn ($t) => [

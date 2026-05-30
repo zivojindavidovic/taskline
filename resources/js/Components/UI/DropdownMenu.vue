@@ -7,13 +7,8 @@
     <Teleport to="body">
       <div
         v-if="open"
-        class="fixed inset-0 z-50"
-        style="pointer-events:none"
-      />
-      <div
-        v-if="open"
         ref="menu"
-        class="fixed z-50 min-w-[180px]"
+        class="fixed min-w-[180px]"
         :style="menuStyle"
         @click="onInnerClick"
       >
@@ -58,6 +53,9 @@ function buildStyle() {
     borderRadius: 'var(--r-md)',
     boxShadow: 'var(--shadow-lg)',
     padding: '4px',
+    // Must sit above every fixed layer in the app (task panel 51, participants
+    // modal 200/201, subtask panel 300). Inline so it never depends on Tailwind.
+    zIndex: 1000,
   }
   if (props.width) style.width = props.width + 'px'
 
