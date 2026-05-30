@@ -70,12 +70,7 @@ class HandleInertiaRequests extends Middleware
                     ->get(['id', 'name', 'key', 'color'])
                 : [],
             'inbox_count' => $user
-                ? \App\Models\TaskComment::whereHas('task', fn ($q) => $q->where('assignee_id', $user->id))
-                    ->where('user_id', '!=', $user->id)
-                    ->count()
-                  + \App\Models\Task::where('assignee_id', $user->id)
-                    ->where('created_by', '!=', $user->id)
-                    ->count()
+                ? app(\App\Services\InboxService::class)->build($user)->count()
                 : 0,
             'my_tasks_count' => $user
                 ? \App\Models\Task::where('assignee_id', $user->id)

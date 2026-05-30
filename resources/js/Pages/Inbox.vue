@@ -4,7 +4,7 @@
       <h2 class="text-xl font-semibold mb-1" style="color: var(--fg)">Inbox</h2>
       <p class="text-sm mb-4" style="color: var(--fg-muted)">Notifications across all your projects.</p>
 
-      <div class="rounded-xl overflow-hidden" style="border: 1px solid var(--border)">
+      <div v-if="notifications.length" class="rounded-xl overflow-hidden" style="border: 1px solid var(--border)">
         <div
           v-for="(n, i) in notifications"
           :key="n.id"
@@ -23,11 +23,23 @@
               {{ n.verb }}
               <strong class="font-mono">{{ n.target }}</strong>
             </p>
-            <p class="text-xs mt-0.5 truncate" style="color: var(--fg-muted)">{{ n.excerpt }}</p>
+            <p v-if="n.excerpt" class="text-xs mt-0.5 truncate" style="color: var(--fg-muted)">{{ n.excerpt }}</p>
           </div>
 
           <div class="text-xs shrink-0" style="color: var(--fg-subtle)">{{ n.time }}</div>
         </div>
+      </div>
+
+      <div
+        v-else
+        class="rounded-xl flex flex-col items-center justify-center text-center px-6 py-16"
+        style="border: 1px solid var(--border)"
+      >
+        <InboxIcon class="w-6 h-6 mb-3" style="color: var(--fg-subtle)" />
+        <p class="text-sm font-medium" style="color: var(--fg)">You're all caught up</p>
+        <p class="text-xs mt-1" style="color: var(--fg-muted)">
+          Mentions, assignments and activity on your tasks will show up here.
+        </p>
       </div>
     </div>
   </AppLayout>
@@ -37,6 +49,7 @@
 import { router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Avatar from '@/Components/UI/Avatar.vue'
+import { InboxIcon } from '@/Components/UI/Icons.vue'
 
 const props = defineProps({
   notifications: { type: Array, default: () => [] },
