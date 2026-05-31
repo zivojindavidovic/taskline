@@ -80,6 +80,14 @@
 
     <!-- Main -->
     <main class="main-area">
+      <!-- Page topbar: shows the active view label (matches design) -->
+      <header v-if="title || $slots.actions" class="app-topbar">
+        <div class="crumbs">
+          <span class="crumb-current">{{ title }}</span>
+        </div>
+        <slot name="actions" />
+      </header>
+
       <slot />
     </main>
   </div>
@@ -104,6 +112,13 @@ import {
   ChevronIcon, HomeIcon, InboxIcon, UserIcon,
   PlusIcon, HistoryIcon, SettingsIcon, LogoutIcon,
 } from '@/Components/UI/Icons.vue'
+
+defineProps({
+  // Label shown in the page topbar (e.g. "Dashboard", "Inbox").
+  // When empty and no #actions slot is provided, the topbar is hidden so
+  // pages that render their own topbar (e.g. Projects/Show) aren't doubled up.
+  title: { type: String, default: '' },
+})
 
 const page = usePage()
 const user = computed(() => page.props.auth.user)
@@ -318,4 +333,29 @@ onBeforeUnmount(() => {
   background: var(--bg-app);
   overflow-y: auto;
 }
+
+/* Page topbar */
+.app-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-app);
+  min-height: 48px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg-muted);
+  flex: 1;
+  min-width: 0;
+}
+.crumb-current { color: var(--fg); font-weight: 500; }
 </style>

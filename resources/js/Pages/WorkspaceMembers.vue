@@ -1,5 +1,5 @@
 <template>
-  <AppLayout>
+  <AppLayout title="Members">
     <div class="members-page">
 
       <!-- Page header -->

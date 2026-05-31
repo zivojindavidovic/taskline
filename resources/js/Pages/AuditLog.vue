@@ -1,5 +1,5 @@
 <template>
-  <AppLayout>
+  <AppLayout title="Audit log">
     <div class="audit-page">
 
       <!-- Header -->

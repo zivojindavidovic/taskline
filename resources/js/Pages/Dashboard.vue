@@ -1,5 +1,13 @@
 <template>
-  <AppLayout>
+  <AppLayout title="Dashboard">
+    <!-- Topbar search (matches design) -->
+    <template #actions>
+      <div class="dash-search">
+        <SearchIcon class="dash-search-icon" />
+        <input v-model="searchQuery" class="dash-search-input" placeholder="Search everywhere…" />
+      </div>
+    </template>
+
     <div class="dash">
       <!-- Greeting -->
       <div>
@@ -76,7 +84,7 @@ import { router, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
 import GlobalTaskPanel from '@/Components/Task/GlobalTaskPanel.vue'
-import { CheckIcon, UserIcon, ArrowRightIcon } from '@/Components/UI/Icons.vue'
+import { CheckIcon, UserIcon, ArrowRightIcon, SearchIcon } from '@/Components/UI/Icons.vue'
 
 const props = defineProps({
   stats:              { type: Object, default: () => ({}) },
@@ -107,6 +115,7 @@ const statsCards = computed(() => [
 ])
 
 const activeTaskId = ref(null)
+const searchQuery = ref('')
 
 function openTask(task) {
   activeTaskId.value = task.id
@@ -116,3 +125,38 @@ function viewAllTasks() {
   router.visit(route('my-tasks'))
 }
 </script>
+
+<style scoped>
+.dash-search {
+  position: relative;
+  width: 280px;
+  flex-shrink: 0;
+}
+.dash-search-icon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--fg-subtle);
+  width: 14px; height: 14px;
+  pointer-events: none;
+}
+.dash-search-input {
+  padding-left: 28px;
+  height: 28px;
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--fg);
+  outline: none;
+  transition: border-color 80ms, box-shadow 80ms;
+}
+.dash-search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.dash-search-input::placeholder { color: var(--fg-subtle); }
+</style>

@@ -1,5 +1,5 @@
 <template>
-  <AppLayout>
+  <AppLayout title="My tasks">
     <div style="width: 100%; max-width: 880px; margin: 0 auto; padding: 24px 32px">
       <h2 style="font-size: 20px; font-weight: 600; margin: 0 0 16px; color: var(--fg)">My tasks</h2>
 

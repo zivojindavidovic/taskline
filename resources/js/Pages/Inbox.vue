@@ -1,5 +1,5 @@
 <template>
-  <AppLayout>
+  <AppLayout title="Inbox">
     <div class="px-8 py-6" style="max-width: 880px; margin: 0 auto">
       <h2 class="text-xl font-semibold mb-1" style="color: var(--fg)">Inbox</h2>
       <p class="text-sm mb-4" style="color: var(--fg-muted)">Notifications across all your projects.</p>
