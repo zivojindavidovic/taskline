@@ -70,7 +70,7 @@ class FilterViewPersistenceTest extends TestCase
     public function test_visiting_with_sprint_query_persists_view_for_that_sprint(): void
     {
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}?sprint={$this->sprint->id}");
+            ->get("/projects/{$this->project->uuid}?sprint={$this->sprint->uuid}");
 
         $response->assertOk();
 
@@ -85,7 +85,7 @@ class FilterViewPersistenceTest extends TestCase
     public function test_visiting_with_backlog_query_persists_backlog_view(): void
     {
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}?backlog=1");
+            ->get("/projects/{$this->project->uuid}?backlog=1");
 
         $response->assertOk();
 
@@ -100,7 +100,7 @@ class FilterViewPersistenceTest extends TestCase
     public function test_visiting_with_all_query_persists_all_view(): void
     {
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}?all=1");
+            ->get("/projects/{$this->project->uuid}?all=1");
 
         $response->assertOk();
 
@@ -125,7 +125,7 @@ class FilterViewPersistenceTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}");
+            ->get("/projects/{$this->project->uuid}");
 
         $response->assertOk();
         $props = $this->pageProps($response);
@@ -143,7 +143,7 @@ class FilterViewPersistenceTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}");
+            ->get("/projects/{$this->project->uuid}");
 
         $response->assertOk();
         $props = $this->pageProps($response);
@@ -169,7 +169,7 @@ class FilterViewPersistenceTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}");
+            ->get("/projects/{$this->project->uuid}");
 
         $response->assertOk();
         $props = $this->pageProps($response);
@@ -190,7 +190,7 @@ class FilterViewPersistenceTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}");
+            ->get("/projects/{$this->project->uuid}");
 
         $response->assertOk();
         $props = $this->pageProps($response);
@@ -219,7 +219,7 @@ class FilterViewPersistenceTest extends TestCase
         $doomed->delete();
 
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}");
+            ->get("/projects/{$this->project->uuid}");
 
         $response->assertOk();
         $props = $this->pageProps($response);
@@ -240,7 +240,7 @@ class FilterViewPersistenceTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}?backlog=1")
+            ->get("/projects/{$this->project->uuid}?backlog=1")
             ->assertOk();
 
         $this->assertDatabaseHas('user_project_filters', [
@@ -251,7 +251,7 @@ class FilterViewPersistenceTest extends TestCase
 
         // Now visiting without any query should restore "backlog".
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}");
+            ->get("/projects/{$this->project->uuid}");
         $this->assertTrue($this->pageProps($response)['isBacklog']);
     }
 
@@ -273,7 +273,7 @@ class FilterViewPersistenceTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}?all=1")
+            ->get("/projects/{$this->project->uuid}?all=1")
             ->assertOk();
 
         $filter = UserProjectFilter::where('user_id', $this->owner->id)
@@ -300,12 +300,12 @@ class FilterViewPersistenceTest extends TestCase
 
         // Owner picks "all"
         $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}?all=1")
+            ->get("/projects/{$this->project->uuid}?all=1")
             ->assertOk();
 
         // Member visits without any query — should NOT inherit owner's view
         $response = $this->actingAs($member)
-            ->get("/projects/{$this->project->id}");
+            ->get("/projects/{$this->project->uuid}");
         $props = $this->pageProps($response);
         $this->assertFalse($props['isAll']);
         $this->assertFalse($props['isBacklog']);
@@ -331,17 +331,17 @@ class FilterViewPersistenceTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}?backlog=1")
+            ->get("/projects/{$this->project->uuid}?backlog=1")
             ->assertOk();
         $this->actingAs($this->owner)
-            ->get("/projects/{$project2->id}?all=1")
+            ->get("/projects/{$project2->uuid}?all=1")
             ->assertOk();
 
-        $r1 = $this->actingAs($this->owner)->get("/projects/{$this->project->id}");
+        $r1 = $this->actingAs($this->owner)->get("/projects/{$this->project->uuid}");
         $this->assertTrue($this->pageProps($r1)['isBacklog']);
         $this->assertFalse($this->pageProps($r1)['isAll']);
 
-        $r2 = $this->actingAs($this->owner)->get("/projects/{$project2->id}");
+        $r2 = $this->actingAs($this->owner)->get("/projects/{$project2->uuid}");
         $this->assertTrue($this->pageProps($r2)['isAll']);
         $this->assertFalse($this->pageProps($r2)['isBacklog']);
     }
@@ -353,7 +353,7 @@ class FilterViewPersistenceTest extends TestCase
     public function test_saved_filters_prop_includes_view_state(): void
     {
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}?backlog=1");
+            ->get("/projects/{$this->project->uuid}?backlog=1");
 
         $response->assertOk();
         $savedFilters = $this->pageProps($response)['savedFilters'];
@@ -369,7 +369,7 @@ class FilterViewPersistenceTest extends TestCase
     public function test_filter_update_endpoint_accepts_view_fields(): void
     {
         $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'view_mode'      => 'active',
                 'view_sprint_id' => $this->sprint->id,
             ])
@@ -383,7 +383,7 @@ class FilterViewPersistenceTest extends TestCase
     public function test_filter_update_endpoint_rejects_unknown_view_mode(): void
     {
         $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'view_mode' => 'bogus',
             ])
             ->assertUnprocessable()

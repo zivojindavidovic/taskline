@@ -56,7 +56,7 @@ const openCount = computed(() =>
 function confirm() {
   if (!props.sprint) return
   loading.value = true
-  router.post(route('sprints.lock', props.sprint.id), {}, {
+  router.post(route('sprints.lock', props.sprint.uuid), {}, {
     preserveScroll: true,
     onFinish: () => {
       loading.value = false

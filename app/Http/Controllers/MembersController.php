@@ -48,7 +48,7 @@ class MembersController extends Controller
         }
 
         return Inertia::render('Members', [
-            'project' => $project->only(['id', 'name', 'key', 'color']),
+            'project' => $project->only(['id', 'uuid', 'name', 'key', 'color']),
             'members' => $members->values(),
             'isOwner' => $project->owner_id === $user->id,
         ]);

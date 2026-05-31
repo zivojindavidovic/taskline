@@ -89,6 +89,7 @@ class DashboardController extends Controller
 
         $mapTask = fn ($t) => [
             'id'            => $t->id,
+            'uuid'          => $t->uuid,
             'key'           => $t->key,
             'title'         => $t->title,
             'priority'      => $t->priority,

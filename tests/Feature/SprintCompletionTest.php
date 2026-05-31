@@ -82,7 +82,7 @@ class SprintCompletionTest extends TestCase
     public function test_member_can_complete_an_active_sprint(): void
     {
         $this->actingAs($this->owner)
-            ->post("/sprints/{$this->sprint->id}/complete")
+            ->post("/sprints/{$this->sprint->uuid}/complete")
             ->assertRedirect();
 
         $this->assertDatabaseHas('sprints', [
@@ -94,7 +94,7 @@ class SprintCompletionTest extends TestCase
     public function test_completing_sprint_writes_audit_log(): void
     {
         $this->actingAs($this->owner)
-            ->post("/sprints/{$this->sprint->id}/complete");
+            ->post("/sprints/{$this->sprint->uuid}/complete");
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id'    => $this->owner->id,
@@ -108,7 +108,7 @@ class SprintCompletionTest extends TestCase
         $this->sprint->update(['status' => 'completed']);
 
         $this->actingAs($this->owner)
-            ->post("/sprints/{$this->sprint->id}/complete")
+            ->post("/sprints/{$this->sprint->uuid}/complete")
             ->assertStatus(422);
     }
 
@@ -117,7 +117,7 @@ class SprintCompletionTest extends TestCase
         $this->sprint->update(['locked' => true]);
 
         $this->actingAs($this->owner)
-            ->post("/sprints/{$this->sprint->id}/complete")
+            ->post("/sprints/{$this->sprint->uuid}/complete")
             ->assertRedirect();
 
         $this->assertDatabaseHas('sprints', [
@@ -129,7 +129,7 @@ class SprintCompletionTest extends TestCase
 
     public function test_guest_cannot_complete_sprint(): void
     {
-        $this->post("/sprints/{$this->sprint->id}/complete")
+        $this->post("/sprints/{$this->sprint->uuid}/complete")
             ->assertRedirect('/login');
 
         $this->assertDatabaseHas('sprints', [
@@ -147,7 +147,7 @@ class SprintCompletionTest extends TestCase
         $this->sprint->update(['status' => 'completed']);
 
         $this->actingAs($this->owner)
-            ->post("/sprints/{$this->sprint->id}/reopen")
+            ->post("/sprints/{$this->sprint->uuid}/reopen")
             ->assertRedirect();
 
         $this->assertDatabaseHas('sprints', [
@@ -163,7 +163,7 @@ class SprintCompletionTest extends TestCase
     public function test_cannot_reopen_a_sprint_that_is_not_completed(): void
     {
         $this->actingAs($this->owner)
-            ->post("/sprints/{$this->sprint->id}/reopen")
+            ->post("/sprints/{$this->sprint->uuid}/reopen")
             ->assertStatus(422);
     }
 
@@ -177,7 +177,7 @@ class SprintCompletionTest extends TestCase
         $task = $this->makeTask();
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$task->id}/complete")
+            ->post("/tasks/{$task->uuid}/complete")
             ->assertRedirect();
 
         $this->assertDatabaseHas('tasks', [
@@ -198,7 +198,7 @@ class SprintCompletionTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$task->id}/uncomplete")
+            ->post("/tasks/{$task->uuid}/uncomplete")
             ->assertRedirect();
 
         $this->assertDatabaseHas('tasks', [
@@ -215,7 +215,7 @@ class SprintCompletionTest extends TestCase
         $task = $this->makeTask();
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$task->id}/complete");
+            ->post("/tasks/{$task->uuid}/complete");
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $this->owner->id,
@@ -234,7 +234,7 @@ class SprintCompletionTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$task->id}/uncomplete");
+            ->post("/tasks/{$task->uuid}/uncomplete");
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $this->owner->id,

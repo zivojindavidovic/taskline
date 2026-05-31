@@ -146,7 +146,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([BoardColumnUpdated::class]);
 
         $this->actingAs($this->owner)
-            ->post("/projects/{$this->project->id}/columns", ['name' => 'Blocked'])
+            ->post("/projects/{$this->project->uuid}/columns", ['name' => 'Blocked'])
             ->assertRedirect();
 
         Event::assertDispatched(BoardColumnUpdated::class, fn (BoardColumnUpdated $e) =>
@@ -204,7 +204,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([SprintUpdated::class]);
 
         $this->actingAs($this->owner)
-            ->post("/projects/{$this->project->id}/sprints", ['name' => 'Sprint 2'])
+            ->post("/projects/{$this->project->uuid}/sprints", ['name' => 'Sprint 2'])
             ->assertRedirect();
 
         Event::assertDispatched(SprintUpdated::class, fn (SprintUpdated $e) =>
@@ -217,7 +217,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([SprintUpdated::class]);
 
         $this->actingAs($this->owner)
-            ->post("/sprints/{$sprint->id}/{$route}")
+            ->post("/sprints/{$sprint->uuid}/{$route}")
             ->assertRedirect();
 
         Event::assertDispatched(SprintUpdated::class, fn (SprintUpdated $e) =>
@@ -286,7 +286,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([TaskDeleted::class]);
 
         $this->actingAs($this->owner)
-            ->delete("/tasks/{$task->id}")
+            ->delete("/tasks/{$task->uuid}")
             ->assertRedirect();
 
         Event::assertDispatched(TaskDeleted::class, fn (TaskDeleted $e) =>
@@ -304,7 +304,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([TaskAccessRequestUpdated::class]);
 
         $this->actingAs($outsider)
-            ->postJson("/tasks/{$task->id}/access-requests", ['message' => 'Need context'])
+            ->postJson("/tasks/{$task->uuid}/access-requests", ['message' => 'Need context'])
             ->assertCreated();
 
         Event::assertDispatched(TaskAccessRequestUpdated::class, fn (TaskAccessRequestUpdated $e) =>
@@ -325,7 +325,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([TaskAccessRequestUpdated::class]);
 
         $this->actingAs($this->owner)
-            ->postJson("/tasks/{$task->id}/access-requests/{$req->id}/approve")
+            ->postJson("/tasks/{$task->uuid}/access-requests/{$req->id}/approve")
             ->assertOk();
 
         Event::assertDispatched(TaskAccessRequestUpdated::class, fn (TaskAccessRequestUpdated $e) =>
@@ -344,7 +344,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([TaskAccessRequestUpdated::class]);
 
         $this->actingAs($this->owner)
-            ->postJson("/tasks/{$task->id}/access-requests/{$req->id}/decline")
+            ->postJson("/tasks/{$task->uuid}/access-requests/{$req->id}/decline")
             ->assertOk();
 
         Event::assertDispatched(TaskAccessRequestUpdated::class, fn (TaskAccessRequestUpdated $e) =>
@@ -410,7 +410,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([ProjectMembersChanged::class]);
 
         $this->actingAs($this->owner)
-            ->post("/projects/{$this->project->id}/members/invite", [
+            ->post("/projects/{$this->project->uuid}/members/invite", [
                 'email' => $carol->email,
                 'role'  => 'member',
             ])
@@ -428,7 +428,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([ProjectMembersChanged::class]);
 
         $this->actingAs($this->owner)
-            ->delete("/projects/{$this->project->id}/members/{$this->bob->id}")
+            ->delete("/projects/{$this->project->uuid}/members/{$this->bob->id}")
             ->assertRedirect();
 
         Event::assertDispatched(ProjectMembersChanged::class, fn (ProjectMembersChanged $e) =>
@@ -486,7 +486,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([InboxNotificationSent::class]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['assignee_ids' => [$this->alice->id]])
+            ->patch("/tasks/{$task->uuid}", ['assignee_ids' => [$this->alice->id]])
             ->assertRedirect();
 
         Event::assertDispatched(InboxNotificationSent::class, fn (InboxNotificationSent $e) =>
@@ -501,7 +501,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([InboxNotificationSent::class]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['assignee_ids' => [$this->owner->id]]);
+            ->patch("/tasks/{$task->uuid}", ['assignee_ids' => [$this->owner->id]]);
 
         Event::assertNotDispatched(InboxNotificationSent::class);
     }
@@ -513,7 +513,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([InboxNotificationSent::class]);
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$task->id}/comments", [
+            ->post("/tasks/{$task->uuid}/comments", [
                 'body' => "Heads up @[Alice](user:{$this->alice->id})",
             ])
             ->assertRedirect();
@@ -539,7 +539,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([TaskUpdated::class]);
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$task->id}/complete")
+            ->post("/tasks/{$task->uuid}/complete")
             ->assertRedirect();
 
         Event::assertDispatched(TaskUpdated::class, fn (TaskUpdated $e) =>
@@ -558,7 +558,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([TaskUpdated::class]);
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$task->id}/uncomplete")
+            ->post("/tasks/{$task->uuid}/uncomplete")
             ->assertRedirect();
 
         Event::assertDispatched(TaskUpdated::class, fn (TaskUpdated $e) =>
@@ -574,7 +574,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([TaskUpdated::class]);
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$subtask->id}/complete")
+            ->post("/tasks/{$subtask->uuid}/complete")
             ->assertRedirect();
 
         // A subtask isn't its own board card; the parent is broadcast so the
@@ -599,7 +599,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([TaskUpdated::class]);
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$subtask->id}/uncomplete")
+            ->post("/tasks/{$subtask->uuid}/uncomplete")
             ->assertRedirect();
 
         Event::assertDispatched(TaskUpdated::class, fn (TaskUpdated $e) =>
@@ -617,7 +617,7 @@ class EventBroadcastingTest extends TestCase
         Event::fake([CommentAdded::class]);
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$subtask->id}/comments", ['body' => 'Note on the subtask'])
+            ->post("/tasks/{$subtask->uuid}/comments", ['body' => 'Note on the subtask'])
             ->assertRedirect();
 
         Event::assertDispatched(CommentAdded::class, fn (CommentAdded $e) =>

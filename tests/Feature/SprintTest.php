@@ -35,14 +35,14 @@ class SprintTest extends TestCase
         Sprint::create(['project_id' => $this->project->id, 'name' => 'Sprint 2', 'status' => 'planned']);
 
         $this->actingAs($this->owner)
-            ->getJson("/api/projects/{$this->project->id}/sprints")
+            ->getJson("/api/projects/{$this->project->uuid}/sprints")
             ->assertOk()
             ->assertJsonCount(2);
     }
 
     public function test_member_can_create_a_sprint(): void
     {
-        $response = $this->actingAs($this->owner)->postJson("/api/projects/{$this->project->id}/sprints", [
+        $response = $this->actingAs($this->owner)->postJson("/api/projects/{$this->project->uuid}/sprints", [
             'name'       => 'Sprint 1',
             'start_date' => '2026-05-05',
             'end_date'   => '2026-05-19',
@@ -56,7 +56,7 @@ class SprintTest extends TestCase
     public function test_sprint_creation_requires_name(): void
     {
         $this->actingAs($this->owner)
-            ->postJson("/api/projects/{$this->project->id}/sprints", [])
+            ->postJson("/api/projects/{$this->project->uuid}/sprints", [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('name');
     }
@@ -64,7 +64,7 @@ class SprintTest extends TestCase
     public function test_sprint_end_date_must_be_after_start_date(): void
     {
         $this->actingAs($this->owner)
-            ->postJson("/api/projects/{$this->project->id}/sprints", [
+            ->postJson("/api/projects/{$this->project->uuid}/sprints", [
                 'name'       => 'Sprint 1',
                 'start_date' => '2026-05-19',
                 'end_date'   => '2026-05-05',
@@ -78,7 +78,7 @@ class SprintTest extends TestCase
         $other = User::factory()->create();
 
         $this->actingAs($other)
-            ->postJson("/api/projects/{$this->project->id}/sprints", ['name' => 'Sprint 1'])
+            ->postJson("/api/projects/{$this->project->uuid}/sprints", ['name' => 'Sprint 1'])
             ->assertForbidden();
     }
 
@@ -91,7 +91,7 @@ class SprintTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->postJson("/api/projects/{$this->project->id}/sprints/{$sprint->id}/lock")
+            ->postJson("/api/projects/{$this->project->uuid}/sprints/{$sprint->uuid}/lock")
             ->assertOk()
             ->assertJsonFragment(['locked' => true]);
 
@@ -107,7 +107,7 @@ class SprintTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->postJson("/api/projects/{$this->project->id}/sprints/{$sprint->id}/lock")
+            ->postJson("/api/projects/{$this->project->uuid}/sprints/{$sprint->uuid}/lock")
             ->assertUnprocessable();
     }
 
@@ -120,7 +120,7 @@ class SprintTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->postJson("/api/projects/{$this->project->id}/sprints/{$sprint->id}/unlock")
+            ->postJson("/api/projects/{$this->project->uuid}/sprints/{$sprint->uuid}/unlock")
             ->assertOk()
             ->assertJsonFragment(['locked' => false]);
     }
@@ -134,7 +134,7 @@ class SprintTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->postJson("/api/projects/{$this->project->id}/sprints/{$sprint->id}/lock");
+            ->postJson("/api/projects/{$this->project->uuid}/sprints/{$sprint->uuid}/lock");
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id'    => $this->owner->id,
@@ -148,7 +148,7 @@ class SprintTest extends TestCase
         $sprint = Sprint::create(['project_id' => $this->project->id, 'name' => 'Sprint 1']);
 
         $this->actingAs($this->owner)
-            ->deleteJson("/api/projects/{$this->project->id}/sprints/{$sprint->id}")
+            ->deleteJson("/api/projects/{$this->project->uuid}/sprints/{$sprint->uuid}")
             ->assertNoContent();
 
         $this->assertDatabaseMissing('sprints', ['id' => $sprint->id]);

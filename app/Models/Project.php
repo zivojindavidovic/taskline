@@ -6,9 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Concerns\HasUuidv7;
 
 class Project extends Model
 {
+    use HasUuidv7;
+
     protected $fillable = ['name', 'key', 'color', 'owner_id', 'workspace_id'];
 
     public function workspace(): \Illuminate\Database\Eloquent\Relations\BelongsTo

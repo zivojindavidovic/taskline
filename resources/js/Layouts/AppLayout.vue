@@ -43,7 +43,7 @@
           Create a workspace first
         </button>
 
-        <NavItem v-for="p in projects" :key="p.id" :href="route('projects.show', p.id)" :active="isProjectActive(p.id)">
+        <NavItem v-for="p in projects" :key="p.id" :href="route('projects.show', p.uuid)" :active="isProjectActive(p.uuid)">
           <span class="project-dot" :style="{ background: p.color }" />
           <span class="truncate">{{ p.name }}</span>
         </NavItem>

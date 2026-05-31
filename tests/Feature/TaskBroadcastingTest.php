@@ -149,7 +149,7 @@ class TaskBroadcastingTest extends TestCase
         // Updating an existing task must not fire TaskCreated.
         $task = $this->makeTask();
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['title' => 'Renamed']);
+            ->patch("/tasks/{$task->uuid}", ['title' => 'Renamed']);
 
         Event::assertNotDispatched(TaskCreated::class);
     }
@@ -162,7 +162,7 @@ class TaskBroadcastingTest extends TestCase
         $task = $this->makeTask(['title' => 'Old']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['title' => 'New'])
+            ->patch("/tasks/{$task->uuid}", ['title' => 'New'])
             ->assertRedirect();
 
         Event::assertDispatched(TaskActivityRecorded::class, function (TaskActivityRecorded $e) use ($task) {
@@ -178,7 +178,7 @@ class TaskBroadcastingTest extends TestCase
         $task = $this->makeTask(['priority' => 'med']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['priority' => 'urgent']);
+            ->patch("/tasks/{$task->uuid}", ['priority' => 'urgent']);
 
         Event::assertDispatched(TaskActivityRecorded::class, fn (TaskActivityRecorded $e) =>
             $e->activity->field === 'priority' && $e->activity->task_id === $task->id
@@ -191,7 +191,7 @@ class TaskBroadcastingTest extends TestCase
         $task = $this->makeTask();
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['assignee_ids' => [$this->alice->id]]);
+            ->patch("/tasks/{$task->uuid}", ['assignee_ids' => [$this->alice->id]]);
 
         Event::assertDispatched(TaskActivityRecorded::class, fn (TaskActivityRecorded $e) =>
             $e->activity->field === 'assignees' && $e->activity->task_id === $task->id
@@ -204,7 +204,7 @@ class TaskBroadcastingTest extends TestCase
         $task = $this->makeTask();
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$task->id}/complete");
+            ->post("/tasks/{$task->uuid}/complete");
 
         Event::assertDispatched(TaskActivityRecorded::class, fn (TaskActivityRecorded $e) =>
             $e->activity->field === 'status'
@@ -219,7 +219,7 @@ class TaskBroadcastingTest extends TestCase
         $task = $this->makeTask(['completed' => true, 'completed_at' => now(), 'completed_by' => $this->owner->id]);
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$task->id}/uncomplete");
+            ->post("/tasks/{$task->uuid}/uncomplete");
 
         Event::assertDispatched(TaskActivityRecorded::class, fn (TaskActivityRecorded $e) =>
             $e->activity->field === 'status' && $e->activity->task_id === $task->id
@@ -242,7 +242,7 @@ class TaskBroadcastingTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$parent->id}/subtasks/{$subtask->id}", ['title' => 'Sub new']);
+            ->patch("/tasks/{$parent->uuid}/subtasks/{$subtask->uuid}", ['title' => 'Sub new']);
 
         Event::assertDispatched(TaskActivityRecorded::class, fn (TaskActivityRecorded $e) =>
             $e->activity->field === 'title'
@@ -257,7 +257,7 @@ class TaskBroadcastingTest extends TestCase
         $task = $this->makeTask(['title' => 'A', 'priority' => 'med']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", [
+            ->patch("/tasks/{$task->uuid}", [
                 'title'    => 'B',
                 'priority' => 'urgent',
             ]);
@@ -271,7 +271,7 @@ class TaskBroadcastingTest extends TestCase
         $task = $this->makeTask(['title' => 'Same']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['title' => 'Same']);
+            ->patch("/tasks/{$task->uuid}", ['title' => 'Same']);
 
         Event::assertNotDispatched(TaskActivityRecorded::class);
     }
@@ -289,7 +289,7 @@ class TaskBroadcastingTest extends TestCase
         $task = $this->makeTask();
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['project_id' => $other->id]);
+            ->patch("/tasks/{$task->uuid}", ['project_id' => $other->id]);
 
         Event::assertDispatched(TaskActivityRecorded::class, fn (TaskActivityRecorded $e) =>
             $e->activity->field === 'project' && $e->projectId === $other->id

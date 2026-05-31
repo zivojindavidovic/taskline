@@ -53,7 +53,7 @@ class TaskCommentTest extends TestCase
     public function test_member_can_add_a_comment(): void
     {
         $response = $this->actingAs($this->owner)
-            ->postJson("/api/projects/{$this->project->id}/tasks/{$this->task->id}/comments", [
+            ->postJson("/api/projects/{$this->project->uuid}/tasks/{$this->task->uuid}/comments", [
                 'body' => 'This is a comment.',
             ]);
 
@@ -67,7 +67,7 @@ class TaskCommentTest extends TestCase
     public function test_comment_requires_body(): void
     {
         $this->actingAs($this->owner)
-            ->postJson("/api/projects/{$this->project->id}/tasks/{$this->task->id}/comments", [])
+            ->postJson("/api/projects/{$this->project->uuid}/tasks/{$this->task->uuid}/comments", [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('body');
     }
@@ -77,7 +77,7 @@ class TaskCommentTest extends TestCase
         $other = User::factory()->create();
 
         $this->actingAs($other)
-            ->postJson("/api/projects/{$this->project->id}/tasks/{$this->task->id}/comments", [
+            ->postJson("/api/projects/{$this->project->uuid}/tasks/{$this->task->uuid}/comments", [
                 'body' => 'Unauthorized comment.',
             ])
             ->assertForbidden();
@@ -93,7 +93,7 @@ class TaskCommentTest extends TestCase
 
         $this->actingAs($this->owner)
             ->postJson(
-                "/api/projects/{$this->project->id}/tasks/{$this->task->id}/comments/{$comment->id}/reply",
+                "/api/projects/{$this->project->uuid}/tasks/{$this->task->uuid}/comments/{$comment->id}/reply",
                 ['body' => 'This is a reply.']
             )
             ->assertCreated()
@@ -115,7 +115,7 @@ class TaskCommentTest extends TestCase
 
         $this->actingAs($this->owner)
             ->deleteJson(
-                "/api/projects/{$this->project->id}/tasks/{$this->task->id}/comments/{$comment->id}"
+                "/api/projects/{$this->project->uuid}/tasks/{$this->task->uuid}/comments/{$comment->id}"
             )
             ->assertNoContent();
 
@@ -135,7 +135,7 @@ class TaskCommentTest extends TestCase
 
         $this->actingAs($other)
             ->deleteJson(
-                "/api/projects/{$this->project->id}/tasks/{$this->task->id}/comments/{$comment->id}"
+                "/api/projects/{$this->project->uuid}/tasks/{$this->task->uuid}/comments/{$comment->id}"
             )
             ->assertForbidden();
     }

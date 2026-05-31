@@ -94,7 +94,7 @@ class TaskAccessRequestTest extends TestCase
         $outsider = $this->makeOutsider();
         $task = $this->makeTask();
 
-        $response = $this->actingAs($outsider)->getJson("/tasks/{$task->id}/details");
+        $response = $this->actingAs($outsider)->getJson("/tasks/{$task->uuid}/details");
 
         $response->assertForbidden()
             ->assertJson([
@@ -117,7 +117,7 @@ class TaskAccessRequestTest extends TestCase
             'status'  => TaskAccessRequest::STATUS_PENDING,
         ]);
 
-        $this->actingAs($outsider)->getJson("/tasks/{$task->id}/details")
+        $this->actingAs($outsider)->getJson("/tasks/{$task->uuid}/details")
             ->assertForbidden()
             ->assertJsonPath('pendingRequest.status', 'pending');
     }
@@ -128,7 +128,7 @@ class TaskAccessRequestTest extends TestCase
         $this->attachMember($alice);
         $task = $this->makeTask();
 
-        $this->actingAs($alice)->getJson("/tasks/{$task->id}/details")
+        $this->actingAs($alice)->getJson("/tasks/{$task->uuid}/details")
             ->assertOk()
             ->assertJsonPath('task.title', 'Empty-state illustrations');
     }
@@ -141,7 +141,7 @@ class TaskAccessRequestTest extends TestCase
         $task = $this->makeTask();
 
         $this->actingAs($outsider)
-            ->postJson("/tasks/{$task->id}/access-requests", ['message' => 'Need context'])
+            ->postJson("/tasks/{$task->uuid}/access-requests", ['message' => 'Need context'])
             ->assertCreated()
             ->assertJsonPath('status', 'pending');
 
@@ -158,8 +158,8 @@ class TaskAccessRequestTest extends TestCase
         $outsider = $this->makeOutsider();
         $task = $this->makeTask();
 
-        $this->actingAs($outsider)->postJson("/tasks/{$task->id}/access-requests")->assertCreated();
-        $this->actingAs($outsider)->postJson("/tasks/{$task->id}/access-requests")->assertCreated();
+        $this->actingAs($outsider)->postJson("/tasks/{$task->uuid}/access-requests")->assertCreated();
+        $this->actingAs($outsider)->postJson("/tasks/{$task->uuid}/access-requests")->assertCreated();
 
         $this->assertSame(1, TaskAccessRequest::where('task_id', $task->id)
             ->where('user_id', $outsider->id)->count());
@@ -175,7 +175,7 @@ class TaskAccessRequestTest extends TestCase
             'status'  => TaskAccessRequest::STATUS_DECLINED,
         ]);
 
-        $this->actingAs($outsider)->postJson("/tasks/{$task->id}/access-requests")->assertCreated();
+        $this->actingAs($outsider)->postJson("/tasks/{$task->uuid}/access-requests")->assertCreated();
 
         $this->assertSame('pending', $req->fresh()->status);
     }
@@ -187,7 +187,7 @@ class TaskAccessRequestTest extends TestCase
         $task = $this->makeTask();
 
         $this->actingAs($alice)
-            ->postJson("/tasks/{$task->id}/access-requests")
+            ->postJson("/tasks/{$task->uuid}/access-requests")
             ->assertStatus(422);
 
         $this->assertDatabaseCount('task_access_requests', 0);
@@ -203,7 +203,7 @@ class TaskAccessRequestTest extends TestCase
             'task_id' => $task->id, 'user_id' => $outsider->id, 'status' => 'pending',
         ]);
 
-        $response = $this->actingAs($this->owner)->getJson("/tasks/{$task->id}/access-requests");
+        $response = $this->actingAs($this->owner)->getJson("/tasks/{$task->uuid}/access-requests");
 
         $response->assertOk()
             ->assertJsonPath('can_manage', true)
@@ -216,7 +216,7 @@ class TaskAccessRequestTest extends TestCase
         $this->attachMember($alice, 'member');
         $task = $this->makeTask();
 
-        $this->actingAs($alice)->getJson("/tasks/{$task->id}/access-requests")
+        $this->actingAs($alice)->getJson("/tasks/{$task->uuid}/access-requests")
             ->assertOk()
             ->assertJsonPath('can_manage', false);
     }
@@ -227,7 +227,7 @@ class TaskAccessRequestTest extends TestCase
         $this->attachMember($admin, 'admin');
         $task = $this->makeTask();
 
-        $this->actingAs($admin)->getJson("/tasks/{$task->id}/access-requests")
+        $this->actingAs($admin)->getJson("/tasks/{$task->uuid}/access-requests")
             ->assertOk()
             ->assertJsonPath('can_manage', true);
     }
@@ -237,7 +237,7 @@ class TaskAccessRequestTest extends TestCase
         $outsider = $this->makeOutsider();
         $task = $this->makeTask();
 
-        $this->actingAs($outsider)->getJson("/tasks/{$task->id}/access-requests")
+        $this->actingAs($outsider)->getJson("/tasks/{$task->uuid}/access-requests")
             ->assertForbidden();
     }
 
@@ -252,7 +252,7 @@ class TaskAccessRequestTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->postJson("/tasks/{$task->id}/access-requests/{$req->id}/approve")
+            ->postJson("/tasks/{$task->uuid}/access-requests/{$req->id}/approve")
             ->assertOk()
             ->assertJsonPath('status', 'approved');
 
@@ -265,16 +265,16 @@ class TaskAccessRequestTest extends TestCase
         );
 
         // They can open exactly this task, with full content…
-        $this->actingAs($outsider)->getJson("/tasks/{$task->id}/details")
+        $this->actingAs($outsider)->getJson("/tasks/{$task->uuid}/details")
             ->assertOk()
             ->assertJsonPath('task.title', 'Empty-state illustrations');
 
         // …but a sibling task in the same project stays locked.
         $sibling = $this->makeTask(['title' => 'Other task']);
-        $this->actingAs($outsider)->getJson("/tasks/{$sibling->id}/details")->assertForbidden();
+        $this->actingAs($outsider)->getJson("/tasks/{$sibling->uuid}/details")->assertForbidden();
 
         // …and they still can't open the project board (not a member).
-        $this->actingAs($outsider)->get("/projects/{$this->project->id}")->assertForbidden();
+        $this->actingAs($outsider)->get("/projects/{$this->project->uuid}")->assertForbidden();
     }
 
     public function test_granted_user_can_comment_on_task(): void
@@ -286,7 +286,7 @@ class TaskAccessRequestTest extends TestCase
         ]);
 
         $this->actingAs($outsider)
-            ->post("/tasks/{$task->id}/comments", ['body' => 'Thanks for the access!'])
+            ->post("/tasks/{$task->uuid}/comments", ['body' => 'Thanks for the access!'])
             ->assertRedirect();
 
         $this->assertDatabaseHas('task_comments', [
@@ -305,7 +305,7 @@ class TaskAccessRequestTest extends TestCase
         ]);
 
         $participants = $this->actingAs($this->owner)
-            ->getJson("/tasks/{$task->id}/participants")
+            ->getJson("/tasks/{$task->uuid}/participants")
             ->assertOk()
             ->json();
 
@@ -323,14 +323,14 @@ class TaskAccessRequestTest extends TestCase
         ]);
 
         // Access works while approved…
-        $this->actingAs($outsider)->getJson("/tasks/{$task->id}/details")->assertOk();
+        $this->actingAs($outsider)->getJson("/tasks/{$task->uuid}/details")->assertOk();
 
         // …declining the grant revokes it.
         $this->actingAs($this->owner)
-            ->postJson("/tasks/{$task->id}/access-requests/{$req->id}/decline")
+            ->postJson("/tasks/{$task->uuid}/access-requests/{$req->id}/decline")
             ->assertOk();
 
-        $this->actingAs($outsider)->getJson("/tasks/{$task->id}/details")->assertForbidden();
+        $this->actingAs($outsider)->getJson("/tasks/{$task->uuid}/details")->assertForbidden();
     }
 
     public function test_owner_can_decline_without_granting_access(): void
@@ -342,12 +342,12 @@ class TaskAccessRequestTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->postJson("/tasks/{$task->id}/access-requests/{$req->id}/decline")
+            ->postJson("/tasks/{$task->uuid}/access-requests/{$req->id}/decline")
             ->assertOk()
             ->assertJsonPath('status', 'declined');
 
         $this->assertFalse($this->project->members()->where('users.id', $outsider->id)->exists());
-        $this->actingAs($outsider)->getJson("/tasks/{$task->id}/details")->assertForbidden();
+        $this->actingAs($outsider)->getJson("/tasks/{$task->uuid}/details")->assertForbidden();
     }
 
     public function test_plain_member_cannot_approve(): void
@@ -361,7 +361,7 @@ class TaskAccessRequestTest extends TestCase
         ]);
 
         $this->actingAs($alice)
-            ->postJson("/tasks/{$task->id}/access-requests/{$req->id}/approve")
+            ->postJson("/tasks/{$task->uuid}/access-requests/{$req->id}/approve")
             ->assertForbidden();
 
         $this->assertSame('pending', $req->fresh()->status);
@@ -376,7 +376,7 @@ class TaskAccessRequestTest extends TestCase
         ]);
 
         $this->actingAs($outsider)
-            ->postJson("/tasks/{$task->id}/access-requests/{$req->id}/approve")
+            ->postJson("/tasks/{$task->uuid}/access-requests/{$req->id}/approve")
             ->assertForbidden();
     }
 
@@ -390,7 +390,7 @@ class TaskAccessRequestTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->postJson("/tasks/{$taskA->id}/access-requests/{$req->id}/approve")
+            ->postJson("/tasks/{$taskA->uuid}/access-requests/{$req->id}/approve")
             ->assertNotFound();
     }
 

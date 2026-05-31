@@ -104,7 +104,7 @@ const inviteForm = useForm({
 })
 
 function submitInvite() {
-  inviteForm.post(route('projects.members.invite', props.project.id), {
+  inviteForm.post(route('projects.members.invite', props.project.uuid), {
     onSuccess: () => inviteForm.reset(),
     preserveScroll: true,
   })
@@ -112,7 +112,7 @@ function submitInvite() {
 
 function updateRole(member, role) {
   router.patch(
-    route('projects.members.role', [props.project.id, member.id]),
+    route('projects.members.role', [props.project.uuid, member.id]),
     { role },
     { preserveScroll: true }
   )
@@ -121,7 +121,7 @@ function updateRole(member, role) {
 function removeMember(member) {
   if (!confirm(`Remove ${member.name} from this project?`)) return
   router.delete(
-    route('projects.members.remove', [props.project.id, member.id]),
+    route('projects.members.remove', [props.project.uuid, member.id]),
     { preserveScroll: true }
   )
 }

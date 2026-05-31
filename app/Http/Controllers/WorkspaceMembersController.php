@@ -32,9 +32,23 @@ class WorkspaceMembersController extends Controller
 
         abort_unless($workspace, 404);
 
+        // Owners/admins manage the whole access matrix, so they see every
+        // project in the workspace. A plain member only sees the projects they
+        // actually belong to — same scoping the sidebar and My tasks use — so
+        // the Members tab can't leak the existence of projects they can't open.
+        $wsRole = $workspace->users()
+            ->where('users.id', $user->id)
+            ->first()?->pivot->role;
+        $managesAll = $workspace->owner_id === $user->id
+            || in_array($wsRole, ['owner', 'admin'], true);
+
         $projects = $workspace->projects()
+            ->when(! $managesAll, fn ($q) => $q->where(function ($q2) use ($user) {
+                $q2->where('owner_id', $user->id)
+                   ->orWhereHas('members', fn ($q3) => $q3->where('users.id', $user->id));
+            }))
             ->orderBy('name')
-            ->get(['id', 'key', 'name', 'color']);
+            ->get(['id', 'uuid', 'key', 'name', 'color']);
 
         $projectIds = $projects->pluck('id');
 

@@ -84,7 +84,7 @@ class TaskParticipantsTest extends TestCase
         TaskComment::create(['task_id' => $task->id, 'user_id' => $bob->id, 'body' => 'hello']);
 
         $response = $this->actingAs($this->owner)
-            ->getJson("/tasks/{$task->id}/participants");
+            ->getJson("/tasks/{$task->uuid}/participants");
 
         $response->assertOk();
         $ids = collect($response->json())->pluck('id')->all();
@@ -103,7 +103,7 @@ class TaskParticipantsTest extends TestCase
         $task->update(['assignee_id' => $alice->id]);
 
         $response = $this->actingAs($this->owner)
-            ->getJson("/tasks/{$task->id}/participants");
+            ->getJson("/tasks/{$task->uuid}/participants");
 
         $response->assertOk();
         $alicePayload = collect($response->json())->firstWhere('id', $alice->id);
@@ -117,7 +117,7 @@ class TaskParticipantsTest extends TestCase
         $task = $this->makeTask();
 
         $this->actingAs($outsider)
-            ->getJson("/tasks/{$task->id}/participants")
+            ->getJson("/tasks/{$task->uuid}/participants")
             ->assertForbidden();
     }
 
@@ -125,7 +125,7 @@ class TaskParticipantsTest extends TestCase
     {
         $task = $this->makeTask();
 
-        $this->get("/tasks/{$task->id}/participants")->assertRedirect('/login');
+        $this->get("/tasks/{$task->uuid}/participants")->assertRedirect('/login');
     }
 
     public function test_creating_task_with_assignee_ids_attaches_pivot(): void
@@ -168,7 +168,7 @@ class TaskParticipantsTest extends TestCase
         $task->update(['assignee_id' => $alice->id]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", [
+            ->patch("/tasks/{$task->uuid}", [
                 'assignee_ids' => [$carol->id],
             ])
             ->assertRedirect();

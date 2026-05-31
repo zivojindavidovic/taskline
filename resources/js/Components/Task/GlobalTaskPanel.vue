@@ -99,8 +99,11 @@ async function load(id) {
 }
 
 function refetch() {
-  if (task.value) load(task.value.id)
+  if (task.value) load(task.value.uuid)
 }
+
+// Routes expose uuids; subtasks emit their integer id, so map it to the uuid.
+const subtaskUuid = (id) => task.value?.subtasks?.find(s => s.id === id)?.uuid ?? id
 
 watch(() => props.taskId, (id) => load(id), { immediate: true })
 
@@ -121,48 +124,48 @@ const opts = (after) => ({
 })
 
 function handleUpdate(data) {
-  router.patch(route('tasks.update', task.value.id), data, opts(refetch))
+  router.patch(route('tasks.update', task.value.uuid), data, opts(refetch))
 }
 function complete() {
-  router.post(route('tasks.complete', task.value.id), {}, opts(() => { toast('Task marked complete'); refetch() }))
+  router.post(route('tasks.complete', task.value.uuid), {}, opts(() => { toast('Task marked complete'); refetch() }))
 }
 function uncomplete() {
-  router.post(route('tasks.uncomplete', task.value.id), {}, opts(() => { toast('Task reopened'); refetch() }))
+  router.post(route('tasks.uncomplete', task.value.uuid), {}, opts(() => { toast('Task reopened'); refetch() }))
 }
 function remove() {
-  const id = task.value.id
+  const uuid = task.value.uuid
   close()
-  router.delete(route('tasks.destroy', id), { preserveScroll: true, preserveState: true, onSuccess: () => toast('Task deleted') })
+  router.delete(route('tasks.destroy', uuid), { preserveScroll: true, preserveState: true, onSuccess: () => toast('Task deleted') })
 }
 function postComment(body) {
-  router.post(route('tasks.comments.store', task.value.id), { body }, opts(refetch))
+  router.post(route('tasks.comments.store', task.value.uuid), { body }, opts(refetch))
 }
 function postReply(commentId, body) {
-  router.post(route('tasks.comments.reply', [task.value.id, commentId]), { body }, opts(refetch))
+  router.post(route('tasks.comments.reply', [task.value.uuid, commentId]), { body }, opts(refetch))
 }
 function postSubtaskComment(subtaskId, body) {
-  router.post(route('tasks.comments.store', subtaskId), { body }, opts(refetch))
+  router.post(route('tasks.comments.store', subtaskUuid(subtaskId)), { body }, opts(refetch))
 }
 function postSubtaskReply(subtaskId, commentId, body) {
-  router.post(route('tasks.comments.reply', [subtaskId, commentId]), { body }, opts(refetch))
+  router.post(route('tasks.comments.reply', [subtaskUuid(subtaskId), commentId]), { body }, opts(refetch))
 }
 function addSubtask(data) {
-  router.post(route('tasks.subtasks.store', task.value.id), data, opts(refetch))
+  router.post(route('tasks.subtasks.store', task.value.uuid), data, opts(refetch))
 }
 function toggleSubtask(subtaskId, completed) {
   const routeName = completed ? 'tasks.complete' : 'tasks.uncomplete'
-  router.post(route(routeName, subtaskId), {}, opts(refetch))
+  router.post(route(routeName, subtaskUuid(subtaskId)), {}, opts(refetch))
 }
 function removeSubtask(subtaskId) {
-  router.delete(route('tasks.destroy', subtaskId), opts(refetch))
+  router.delete(route('tasks.destroy', subtaskUuid(subtaskId)), opts(refetch))
 }
 function handleSubtaskUpdate(subtaskId, data) {
-  router.patch(route('tasks.subtasks.update', [task.value.id, subtaskId]), data, opts(refetch))
+  router.patch(route('tasks.subtasks.update', [task.value.uuid, subtaskUuid(subtaskId)]), data, opts(refetch))
 }
 function uploadAttachment(file) {
   const form = new FormData()
   form.append('file', file)
-  router.post(route('tasks.attachments.store', task.value.id), form, opts(refetch))
+  router.post(route('tasks.attachments.store', task.value.uuid), form, opts(refetch))
 }
 function removeAttachment(attachmentId) {
   router.delete(route('attachments.destroy', attachmentId), opts(refetch))

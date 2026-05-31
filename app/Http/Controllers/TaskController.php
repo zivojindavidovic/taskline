@@ -211,7 +211,7 @@ class TaskController extends Controller
 
         $allProjects = $workspace->projects()
             ->orderBy('name')
-            ->get(['id', 'name', 'key', 'color']);
+            ->get(['id', 'uuid', 'name', 'key', 'color']);
 
         $locked = $task->sprint_id
             ? (bool) Sprint::whereKey($task->sprint_id)->value('locked')
@@ -219,7 +219,7 @@ class TaskController extends Controller
 
         return response()->json([
             'task'        => $task,
-            'project'     => $project->only(['id', 'name', 'key', 'color']),
+            'project'     => $project->only(['id', 'uuid', 'name', 'key', 'color']),
             'columns'     => $columns,
             'sprints'     => $sprints,
             'allUsers'    => $allUsers,
@@ -409,8 +409,8 @@ class TaskController extends Controller
 
         return response()->json([
             'hasAccess'      => false,
-            'task'           => $task->only(['id', 'key']),
-            'project'        => $project->only(['id', 'name', 'key', 'color']),
+            'task'           => $task->only(['id', 'uuid', 'key']),
+            'project'        => $project->only(['id', 'uuid', 'name', 'key', 'color']),
             'approvers'      => $approvers->values(),
             'pendingRequest' => $pending,
         ], 403);
@@ -435,6 +435,7 @@ class TaskController extends Controller
             ->get()
             ->map(fn ($t) => [
                 'id'          => $t->id,
+                'uuid'        => $t->uuid,
                 'key'         => $t->key,
                 'title'       => $t->title,
                 'priority'    => $t->priority,

@@ -341,7 +341,7 @@
     <!-- New sprint modal -->
     <NewSprintModal
       :show="showNewSprint"
-      :projectId="project.id"
+      :projectId="project.uuid"
       @close="showNewSprint = false"
     />
 
@@ -623,13 +623,14 @@ watch(() => props.tasks, (tasks) => {
   }
 })
 
-// Open a task panel
+// Open a task panel. The deep-link in the address bar carries the task's uuid,
+// never its integer id.
 function openTask(idOrObj) {
   const id = typeof idOrObj === 'object' ? idOrObj.id : idOrObj
   const task = localTasks.value.find(t => t.id === id) ?? null
   activeTask.value = task
   const url = new URL(window.location.href)
-  url.searchParams.set('task', id)
+  url.searchParams.set('task', task?.uuid ?? id)
   history.replaceState(null, '', url)
 }
 
@@ -640,10 +641,10 @@ function closeTask() {
   history.replaceState(null, '', url)
 }
 
-// Open task from URL param on load
+// Open task from URL param on load (matched by uuid).
 const urlTask = new URLSearchParams(window.location.search).get('task')
 if (urlTask) {
-  const t = localTasks.value.find(t => t.id === parseInt(urlTask))
+  const t = localTasks.value.find(t => t.uuid === urlTask)
   if (t) activeTask.value = t
 }
 
@@ -777,31 +778,40 @@ const sprintBadgeStyle = computed(() => {
   return 'background:var(--bg-sunken);color:var(--fg-muted)'
 })
 
+// URLs/routes expose the UUIDv7 of each resource, never its integer id. Child
+// components still emit integer ids (used for local state matching, drag/drop,
+// and request bodies like board_column_id), so these helpers map an integer id
+// to the matching uuid for the route() argument only.
+const findTaskUuid    = (id) => localTasks.value.find(t => t.id === id)?.uuid ?? id
+const findSubtaskUuid = (id) => activeTask.value?.subtasks?.find(s => s.id === id)?.uuid ?? id
+const findColumnUuid  = (id) => props.columns?.find(c => c.id === id)?.uuid ?? id
+const findSprintUuid  = (id) => props.sprints?.find(s => s.id === id)?.uuid ?? id
+
 function switchSprint(id) {
-  router.get(route('projects.show', props.project.id), { sprint: id }, { preserveScroll: false })
+  router.get(route('projects.show', props.project.uuid), { sprint: findSprintUuid(id) }, { preserveScroll: false })
 }
 
 function switchToBacklog() {
-  router.get(route('projects.show', props.project.id), { backlog: '1' }, { preserveScroll: false })
+  router.get(route('projects.show', props.project.uuid), { backlog: '1' }, { preserveScroll: false })
 }
 
 function switchToAll() {
-  router.get(route('projects.show', props.project.id), { all: '1' }, { preserveScroll: false })
+  router.get(route('projects.show', props.project.uuid), { all: '1' }, { preserveScroll: false })
 }
 
 function unlockSprint() {
-  router.post(route('sprints.unlock', props.currentSprint.id), {}, { preserveScroll: true })
+  router.post(route('sprints.unlock', props.currentSprint.uuid), {}, { preserveScroll: true })
 }
 
 function completeSprint() {
-  router.post(route('sprints.complete', props.currentSprint.id), {}, {
+  router.post(route('sprints.complete', props.currentSprint.uuid), {}, {
     preserveScroll: true,
     onSuccess: () => toast(`${props.currentSprint.name} marked complete`),
   })
 }
 
 function reopenSprint() {
-  router.post(route('sprints.reopen', props.currentSprint.id), {}, {
+  router.post(route('sprints.reopen', props.currentSprint.uuid), {}, {
     preserveScroll: true,
     onSuccess: () => toast(`${props.currentSprint.name} reopened`),
   })
@@ -813,7 +823,7 @@ function moveTask(taskId, columnId) {
   const task = localTasks.value.find(t => t.id === taskId)
   if (task) task.board_column_id = columnId
 
-  router.post(route('tasks.move', taskId), { board_column_id: columnId }, {
+  router.post(route('tasks.move', findTaskUuid(taskId)), { board_column_id: columnId }, {
     preserveScroll: true,
     preserveState: true,
     onSuccess: () => {
@@ -829,65 +839,65 @@ function moveTask(taskId, columnId) {
 }
 
 function handleTaskUpdate(data) {
-  router.patch(route('tasks.update', activeTask.value.id), data, {
+  router.patch(route('tasks.update', activeTask.value.uuid), data, {
     preserveScroll: true,
   })
 }
 
 function completeTask() {
-  router.post(route('tasks.complete', activeTask.value.id), {}, {
+  router.post(route('tasks.complete', activeTask.value.uuid), {}, {
     preserveScroll: true,
     onSuccess: () => toast('Task marked complete'),
   })
 }
 
 function uncompleteTask() {
-  router.post(route('tasks.uncomplete', activeTask.value.id), {}, {
+  router.post(route('tasks.uncomplete', activeTask.value.uuid), {}, {
     preserveScroll: true,
     onSuccess: () => toast('Task reopened'),
   })
 }
 
 function deleteTask() {
-  const id = activeTask.value.id
+  const uuid = activeTask.value.uuid
   activeTask.value = null
-  router.delete(route('tasks.destroy', id), {
+  router.delete(route('tasks.destroy', uuid), {
     preserveScroll: true,
     onSuccess: () => toast('Task deleted'),
   })
 }
 
 function postComment(body) {
-  router.post(route('tasks.comments.store', activeTask.value.id), { body }, { preserveScroll: true })
+  router.post(route('tasks.comments.store', activeTask.value.uuid), { body }, { preserveScroll: true })
 }
 
 function postSubtaskComment(subtaskId, body) {
-  router.post(route('tasks.comments.store', subtaskId), { body }, { preserveScroll: true })
+  router.post(route('tasks.comments.store', findSubtaskUuid(subtaskId)), { body }, { preserveScroll: true })
 }
 
 function postSubtaskReply(subtaskId, commentId, body) {
-  router.post(route('tasks.comments.reply', [subtaskId, commentId]), { body }, { preserveScroll: true })
+  router.post(route('tasks.comments.reply', [findSubtaskUuid(subtaskId), commentId]), { body }, { preserveScroll: true })
 }
 
 function postReply(commentId, body) {
-  router.post(route('tasks.comments.reply', [activeTask.value.id, commentId]), { body }, { preserveScroll: true })
+  router.post(route('tasks.comments.reply', [activeTask.value.uuid, commentId]), { body }, { preserveScroll: true })
 }
 
 function addSubtask(data) {
-  router.post(route('tasks.subtasks.store', activeTask.value.id), data, { preserveScroll: true })
+  router.post(route('tasks.subtasks.store', activeTask.value.uuid), data, { preserveScroll: true })
 }
 
 function toggleSubtask(subtaskId, completed) {
   const routeName = completed ? 'tasks.complete' : 'tasks.uncomplete'
-  router.post(route(routeName, subtaskId), {}, { preserveScroll: true })
+  router.post(route(routeName, findSubtaskUuid(subtaskId)), {}, { preserveScroll: true })
 }
 
 function removeSubtask(subtaskId) {
-  router.delete(route('tasks.destroy', subtaskId), { preserveScroll: true })
+  router.delete(route('tasks.destroy', findSubtaskUuid(subtaskId)), { preserveScroll: true })
 }
 
 function handleSubtaskUpdate(subtaskId, data) {
-  router.patch(route('tasks.subtasks.update', [activeTask.value.id, subtaskId]), data, {
+  router.patch(route('tasks.subtasks.update', [activeTask.value.uuid, findSubtaskUuid(subtaskId)]), data, {
     preserveScroll: true,
   })
 }
@@ -895,7 +905,7 @@ function handleSubtaskUpdate(subtaskId, data) {
 function uploadAttachment(file) {
   const form = new FormData()
   form.append('file', file)
-  router.post(route('tasks.attachments.store', activeTask.value.id), form, { preserveScroll: true })
+  router.post(route('tasks.attachments.store', activeTask.value.uuid), form, { preserveScroll: true })
 }
 
 function removeAttachment(attachmentId) {
@@ -903,15 +913,15 @@ function removeAttachment(attachmentId) {
 }
 
 function addColumn(name) {
-  router.post(route('columns.store', props.project.id), { name }, { preserveScroll: true })
+  router.post(route('columns.store', props.project.uuid), { name }, { preserveScroll: true })
 }
 
 function renameColumn(columnId, name) {
-  router.patch(route('columns.update', columnId), { name }, { preserveScroll: true })
+  router.patch(route('columns.update', findColumnUuid(columnId)), { name }, { preserveScroll: true })
 }
 
 function deleteColumn(columnId) {
-  router.delete(route('columns.destroy', columnId), { preserveScroll: true })
+  router.delete(route('columns.destroy', findColumnUuid(columnId)), { preserveScroll: true })
 }
 </script>
 

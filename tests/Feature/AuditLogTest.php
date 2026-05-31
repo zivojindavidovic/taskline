@@ -161,7 +161,7 @@ class AuditLogTest extends TestCase
             'created_by'      => $this->owner->id,
         ]);
 
-        $this->actingAs($this->owner)->delete("/tasks/{$task->id}")->assertRedirect();
+        $this->actingAs($this->owner)->delete("/tasks/{$task->uuid}")->assertRedirect();
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $this->owner->id,
@@ -172,7 +172,7 @@ class AuditLogTest extends TestCase
     public function test_column_creation_writes_audit_entry(): void
     {
         $this->actingAs($this->owner)
-            ->post("/projects/{$this->project->id}/columns", ['name' => 'Blocked', 'color' => '#dc2626'])
+            ->post("/projects/{$this->project->uuid}/columns", ['name' => 'Blocked', 'color' => '#dc2626'])
             ->assertRedirect();
 
         $this->assertDatabaseHas('audit_logs', [

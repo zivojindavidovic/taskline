@@ -64,8 +64,8 @@ const props = defineProps({
 const activeTaskId = ref(null)
 
 function openNotification(n) {
-  if (n.task_id) {
-    activeTaskId.value = n.task_id
+  if (n.task_uuid) {
+    activeTaskId.value = n.task_uuid
   }
 }
 </script>

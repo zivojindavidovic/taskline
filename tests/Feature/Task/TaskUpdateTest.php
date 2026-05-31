@@ -85,7 +85,7 @@ class TaskUpdateTest extends TestCase
         $otherProject->members()->attach($this->owner->id, ['role' => 'owner']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['project_id' => $otherProject->id])
+            ->patch("/tasks/{$this->task->uuid}", ['project_id' => $otherProject->id])
             ->assertRedirect();
 
         $this->assertDatabaseHas('tasks', [
@@ -106,7 +106,7 @@ class TaskUpdateTest extends TestCase
         $otherProject->members()->attach($this->owner->id, ['role' => 'owner']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['project_id' => $otherProject->id]);
+            ->patch("/tasks/{$this->task->uuid}", ['project_id' => $otherProject->id]);
 
         $this->assertDatabaseHas('audit_logs', [
             'task_id' => $this->task->id,
@@ -118,7 +118,7 @@ class TaskUpdateTest extends TestCase
     {
         $this->actingAs($this->owner)
             ->withHeaders(['Accept' => 'application/json'])
-            ->patch("/tasks/{$this->task->id}", ['project_id' => 99999])
+            ->patch("/tasks/{$this->task->uuid}", ['project_id' => 99999])
             ->assertUnprocessable();
     }
 
@@ -149,7 +149,7 @@ class TaskUpdateTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['project_id' => $otherProject->id])
+            ->patch("/tasks/{$this->task->uuid}", ['project_id' => $otherProject->id])
             ->assertRedirect();
 
         $this->task->refresh();
@@ -179,7 +179,7 @@ class TaskUpdateTest extends TestCase
         $this->assertNotNull($this->task->sprint_id);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['project_id' => $otherProject->id])
+            ->patch("/tasks/{$this->task->uuid}", ['project_id' => $otherProject->id])
             ->assertRedirect();
 
         $this->task->refresh();
@@ -199,7 +199,7 @@ class TaskUpdateTest extends TestCase
         $emptyProject->members()->attach($this->owner->id, ['role' => 'owner']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['project_id' => $emptyProject->id])
+            ->patch("/tasks/{$this->task->uuid}", ['project_id' => $emptyProject->id])
             ->assertRedirect();
 
         $this->task->refresh();
@@ -228,7 +228,7 @@ class TaskUpdateTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['project_id' => $otherProject->id]);
+            ->patch("/tasks/{$this->task->uuid}", ['project_id' => $otherProject->id]);
 
         $this->task->refresh();
         $this->assertEquals($otherTodo->id, $this->task->board_column_id);
@@ -243,7 +243,7 @@ class TaskUpdateTest extends TestCase
         // Issue a same-project update touching only the title — confirm the
         // cross-project reset logic does not fire when the project is unchanged.
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", [
+            ->patch("/tasks/{$this->task->uuid}", [
                 'project_id' => $this->project->id,
                 'title'      => 'Renamed in place',
             ])
@@ -262,7 +262,7 @@ class TaskUpdateTest extends TestCase
     public function test_task_can_be_moved_to_backlog_without_changing_project(): void
     {
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['sprint_id' => null])
+            ->patch("/tasks/{$this->task->uuid}", ['sprint_id' => null])
             ->assertRedirect();
 
         $this->task->refresh();
@@ -285,7 +285,7 @@ class TaskUpdateTest extends TestCase
         $this->task->update(['board_column_id' => $doing->id]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['sprint_id' => null]);
+            ->patch("/tasks/{$this->task->uuid}", ['sprint_id' => null]);
 
         $this->task->refresh();
         $this->assertEquals($doing->id, $this->task->board_column_id);
@@ -297,7 +297,7 @@ class TaskUpdateTest extends TestCase
         $originalSprintId = $this->task->sprint_id;
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['sprint_id' => null]);
+            ->patch("/tasks/{$this->task->uuid}", ['sprint_id' => null]);
 
         $log = \App\Models\AuditLog::where('task_id', $this->task->id)
             ->where('action', 'task.moved_to_backlog')
@@ -323,7 +323,7 @@ class TaskUpdateTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$backlogTask->id}", ['sprint_id' => null])
+            ->patch("/tasks/{$backlogTask->uuid}", ['sprint_id' => null])
             ->assertRedirect();
 
         $backlogTask->refresh();
@@ -353,7 +353,7 @@ class TaskUpdateTest extends TestCase
         $emptyProject->members()->attach($this->owner->id, ['role' => 'owner']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['project_id' => $emptyProject->id]);
+            ->patch("/tasks/{$this->task->uuid}", ['project_id' => $emptyProject->id]);
 
         $this->assertDatabaseHas('audit_logs', [
             'task_id' => $this->task->id,
@@ -385,7 +385,7 @@ class TaskUpdateTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['project_id' => $otherProject->id]);
+            ->patch("/tasks/{$this->task->uuid}", ['project_id' => $otherProject->id]);
 
         $log = \App\Models\AuditLog::where('task_id', $this->task->id)
             ->where('action', 'task.project_changed')
@@ -420,7 +420,7 @@ class TaskUpdateTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$taskWithoutSprint->id}", ['sprint_id' => $sprint2->id])
+            ->patch("/tasks/{$taskWithoutSprint->uuid}", ['sprint_id' => $sprint2->id])
             ->assertRedirect();
 
         $this->assertDatabaseHas('tasks', [
@@ -432,7 +432,7 @@ class TaskUpdateTest extends TestCase
     public function test_task_can_be_removed_from_sprint(): void
     {
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['sprint_id' => null])
+            ->patch("/tasks/{$this->task->uuid}", ['sprint_id' => null])
             ->assertRedirect();
 
         $this->assertDatabaseHas('tasks', [
@@ -450,7 +450,7 @@ class TaskUpdateTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['sprint_id' => $sprint2->id])
+            ->patch("/tasks/{$this->task->uuid}", ['sprint_id' => $sprint2->id])
             ->assertRedirect();
 
         $this->assertDatabaseHas('tasks', [
@@ -468,7 +468,7 @@ class TaskUpdateTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['sprint_id' => $sprint2->id]);
+            ->patch("/tasks/{$this->task->uuid}", ['sprint_id' => $sprint2->id]);
 
         $this->assertDatabaseHas('audit_logs', [
             'task_id' => $this->task->id,
@@ -480,7 +480,7 @@ class TaskUpdateTest extends TestCase
     {
         $this->actingAs($this->owner)
             ->withHeaders(['Accept' => 'application/json'])
-            ->patch("/tasks/{$this->task->id}", ['sprint_id' => 99999])
+            ->patch("/tasks/{$this->task->uuid}", ['sprint_id' => 99999])
             ->assertUnprocessable();
     }
 
@@ -508,7 +508,7 @@ class TaskUpdateTest extends TestCase
 
         $this->actingAs($this->owner)
             ->withHeaders(['Accept' => 'application/json'])
-            ->patch("/tasks/{$backlogTask->id}", ['sprint_id' => $lockedSprint->id])
+            ->patch("/tasks/{$backlogTask->uuid}", ['sprint_id' => $lockedSprint->id])
             ->assertStatus(422);
 
         $this->assertDatabaseHas('tasks', [
@@ -527,7 +527,7 @@ class TaskUpdateTest extends TestCase
 
         $this->actingAs($this->owner)
             ->withHeaders(['Accept' => 'application/json'])
-            ->patch("/tasks/{$this->task->id}", ['sprint_id' => $lockedSprint->id])
+            ->patch("/tasks/{$this->task->uuid}", ['sprint_id' => $lockedSprint->id])
             ->assertStatus(422);
 
         $this->assertDatabaseHas('tasks', [
@@ -543,7 +543,7 @@ class TaskUpdateTest extends TestCase
         $this->sprint->update(['locked' => true]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['sprint_id' => null])
+            ->patch("/tasks/{$this->task->uuid}", ['sprint_id' => null])
             ->assertRedirect();
 
         $this->assertDatabaseHas('tasks', [
@@ -560,7 +560,7 @@ class TaskUpdateTest extends TestCase
         $this->sprint->update(['locked' => true]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['sprint_id' => $this->sprint->id])
+            ->patch("/tasks/{$this->task->uuid}", ['sprint_id' => $this->sprint->id])
             ->assertRedirect();
     }
 
@@ -648,7 +648,7 @@ class TaskUpdateTest extends TestCase
     public function test_task_tags_can_be_set(): void
     {
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['tags' => ['frontend', 'backend']])
+            ->patch("/tasks/{$this->task->uuid}", ['tags' => ['frontend', 'backend']])
             ->assertRedirect();
 
         $this->task->refresh();
@@ -660,7 +660,7 @@ class TaskUpdateTest extends TestCase
         $this->task->update(['tags' => ['frontend']]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['tags' => ['frontend', 'backend']]);
+            ->patch("/tasks/{$this->task->uuid}", ['tags' => ['frontend', 'backend']]);
 
         $this->task->refresh();
         $this->assertContains('frontend', $this->task->tags);
@@ -672,7 +672,7 @@ class TaskUpdateTest extends TestCase
         $this->task->update(['tags' => ['frontend', 'design']]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['tags' => []])
+            ->patch("/tasks/{$this->task->uuid}", ['tags' => []])
             ->assertRedirect();
 
         $this->task->refresh();
@@ -682,7 +682,7 @@ class TaskUpdateTest extends TestCase
     public function test_task_tags_update_creates_audit_log(): void
     {
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$this->task->id}", ['tags' => ['frontend', 'bug']]);
+            ->patch("/tasks/{$this->task->uuid}", ['tags' => ['frontend', 'bug']]);
 
         $this->assertDatabaseHas('audit_logs', [
             'task_id' => $this->task->id,
@@ -694,7 +694,7 @@ class TaskUpdateTest extends TestCase
     {
         $this->actingAs($this->owner)
             ->withHeaders(['Accept' => 'application/json'])
-            ->patch("/tasks/{$this->task->id}", ['tags' => [123, 'valid']])
+            ->patch("/tasks/{$this->task->uuid}", ['tags' => [123, 'valid']])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['tags.0']);
     }
@@ -706,7 +706,7 @@ class TaskUpdateTest extends TestCase
     public function test_subtask_can_be_created_with_default_priority(): void
     {
         $this->actingAs($this->owner)
-            ->post("/tasks/{$this->task->id}/subtasks", ['title' => 'My subtask'])
+            ->post("/tasks/{$this->task->uuid}/subtasks", ['title' => 'My subtask'])
             ->assertRedirect();
 
         $this->assertDatabaseHas('tasks', [
@@ -721,7 +721,7 @@ class TaskUpdateTest extends TestCase
     public function test_subtask_can_be_created_with_explicit_priority(): void
     {
         $this->actingAs($this->owner)
-            ->post("/tasks/{$this->task->id}/subtasks", [
+            ->post("/tasks/{$this->task->uuid}/subtasks", [
                 'title'    => 'Urgent subtask',
                 'priority' => 'urgent',
             ])
@@ -737,7 +737,7 @@ class TaskUpdateTest extends TestCase
     public function test_subtask_inherits_parent_project_and_sprint(): void
     {
         $this->actingAs($this->owner)
-            ->post("/tasks/{$this->task->id}/subtasks", ['title' => 'Child task']);
+            ->post("/tasks/{$this->task->uuid}/subtasks", ['title' => 'Child task']);
 
         $subtask = Task::where('parent_task_id', $this->task->id)->first();
         $this->assertEquals($this->task->project_id, $subtask->project_id);
@@ -748,7 +748,7 @@ class TaskUpdateTest extends TestCase
     public function test_subtask_creation_creates_audit_log(): void
     {
         $this->actingAs($this->owner)
-            ->post("/tasks/{$this->task->id}/subtasks", ['title' => 'Audit subtask']);
+            ->post("/tasks/{$this->task->uuid}/subtasks", ['title' => 'Audit subtask']);
 
         $this->assertDatabaseHas('audit_logs', [
             'task_id' => $this->task->id,
@@ -760,7 +760,7 @@ class TaskUpdateTest extends TestCase
     {
         $this->actingAs($this->owner)
             ->withHeaders(['Accept' => 'application/json'])
-            ->post("/tasks/{$this->task->id}/subtasks", [])
+            ->post("/tasks/{$this->task->uuid}/subtasks", [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['title']);
     }
@@ -769,7 +769,7 @@ class TaskUpdateTest extends TestCase
     {
         $this->actingAs($this->owner)
             ->withHeaders(['Accept' => 'application/json'])
-            ->post("/tasks/{$this->task->id}/subtasks", [
+            ->post("/tasks/{$this->task->uuid}/subtasks", [
                 'title'    => 'Bad priority',
                 'priority' => 'invalid',
             ])
@@ -780,7 +780,7 @@ class TaskUpdateTest extends TestCase
     public function test_subtask_gets_sequential_key(): void
     {
         $this->actingAs($this->owner)
-            ->post("/tasks/{$this->task->id}/subtasks", ['title' => 'Sub 1']);
+            ->post("/tasks/{$this->task->uuid}/subtasks", ['title' => 'Sub 1']);
 
         $subtask = Task::where('parent_task_id', $this->task->id)->first();
         $this->assertStringStartsWith('TST-', $subtask->key);
@@ -804,7 +804,7 @@ class TaskUpdateTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->delete("/tasks/{$subtask->id}")
+            ->delete("/tasks/{$subtask->uuid}")
             ->assertRedirect();
 
         $this->assertDatabaseMissing('tasks', ['id' => $subtask->id]);
@@ -824,7 +824,7 @@ class TaskUpdateTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->delete("/tasks/{$subtask->id}");
+            ->delete("/tasks/{$subtask->uuid}");
 
         $this->assertDatabaseHas('tasks', ['id' => $this->task->id]);
     }
@@ -835,19 +835,19 @@ class TaskUpdateTest extends TestCase
 
     public function test_task_update_requires_authentication(): void
     {
-        $this->patch("/tasks/{$this->task->id}", ['tags' => ['x']])
+        $this->patch("/tasks/{$this->task->uuid}", ['tags' => ['x']])
             ->assertRedirect('/login');
     }
 
     public function test_subtask_store_requires_authentication(): void
     {
-        $this->post("/tasks/{$this->task->id}/subtasks", ['title' => 'Sub'])
+        $this->post("/tasks/{$this->task->uuid}/subtasks", ['title' => 'Sub'])
             ->assertRedirect('/login');
     }
 
     public function test_task_delete_requires_authentication(): void
     {
-        $this->delete("/tasks/{$this->task->id}")
+        $this->delete("/tasks/{$this->task->uuid}")
             ->assertRedirect('/login');
     }
 
@@ -856,7 +856,7 @@ class TaskUpdateTest extends TestCase
         $stranger = User::factory()->create();
 
         $this->actingAs($stranger)
-            ->patch("/tasks/{$this->task->id}", ['tags' => ['x']])
+            ->patch("/tasks/{$this->task->uuid}", ['tags' => ['x']])
             ->assertForbidden();
     }
 
@@ -865,7 +865,7 @@ class TaskUpdateTest extends TestCase
         $stranger = User::factory()->create();
 
         $this->actingAs($stranger)
-            ->post("/tasks/{$this->task->id}/subtasks", ['title' => 'Sub'])
+            ->post("/tasks/{$this->task->uuid}/subtasks", ['title' => 'Sub'])
             ->assertForbidden();
     }
 
@@ -874,7 +874,7 @@ class TaskUpdateTest extends TestCase
         $stranger = User::factory()->create();
 
         $this->actingAs($stranger)
-            ->delete("/tasks/{$this->task->id}")
+            ->delete("/tasks/{$this->task->uuid}")
             ->assertForbidden();
     }
 }

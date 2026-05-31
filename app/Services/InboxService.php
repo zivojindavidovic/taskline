@@ -102,10 +102,10 @@ class InboxService
         return CommentMention::where('user_id', $userId)
             ->with([
                 'taskComment.user:id,name',
-                'taskComment.task:id,key,title,project_id',
+                'taskComment.task:id,uuid,key,title,project_id',
                 'taskComment.task.project:id,key',
                 'commentReply.user:id,name',
-                'commentReply.comment.task:id,key,title,project_id',
+                'commentReply.comment.task:id,uuid,key,title,project_id',
                 'commentReply.comment.task.project:id,key',
             ])
             ->latest()
@@ -141,7 +141,7 @@ class InboxService
     {
         return TaskActivity::where('field', TaskActivity::FIELD_ASSIGNEES)
             ->where('user_id', '!=', $userId)
-            ->with(['user:id,name', 'task:id,key,title,project_id', 'task.project:id,key'])
+            ->with(['user:id,name', 'task:id,uuid,key,title,project_id', 'task.project:id,key'])
             ->latest()
             ->take(80)
             ->get()
@@ -174,7 +174,7 @@ class InboxService
         $comments = TaskComment::whereIn('task_id', $participantIds)
             ->where('user_id', '!=', $userId)
             ->whereDoesntHave('mentions', fn ($q) => $q->where('user_id', $userId))
-            ->with(['user:id,name', 'task:id,key,title,project_id', 'task.project:id,key'])
+            ->with(['user:id,name', 'task:id,uuid,key,title,project_id', 'task.project:id,key'])
             ->latest()
             ->take(40)
             ->get()
@@ -192,7 +192,7 @@ class InboxService
         $replies = CommentReply::whereHas('comment', fn ($q) => $q->whereIn('task_id', $participantIds))
             ->where('user_id', '!=', $userId)
             ->whereDoesntHave('mentions', fn ($q) => $q->where('user_id', $userId))
-            ->with(['user:id,name', 'comment.task:id,key,title,project_id', 'comment.task.project:id,key'])
+            ->with(['user:id,name', 'comment.task:id,uuid,key,title,project_id', 'comment.task.project:id,key'])
             ->latest()
             ->take(40)
             ->get()
@@ -220,7 +220,7 @@ class InboxService
         return TaskActivity::where('field', TaskActivity::FIELD_STATUS)
             ->whereIn('task_id', $participantIds)
             ->where('user_id', '!=', $userId)
-            ->with(['user:id,name', 'task:id,key,title,project_id', 'task.project:id,key'])
+            ->with(['user:id,name', 'task:id,uuid,key,title,project_id', 'task.project:id,key'])
             ->latest()
             ->take(40)
             ->get()
@@ -255,6 +255,7 @@ class InboxService
             'excerpt'    => $excerpt,
             'time'       => $createdAt?->diffForHumans(),
             'task_id'    => $task->id,
+            'task_uuid'  => $task->uuid,
             'project_id' => $task->project_id,
             'restricted' => $restricted,
             'created_at' => $createdAt,

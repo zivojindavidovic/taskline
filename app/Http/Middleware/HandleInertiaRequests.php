@@ -67,7 +67,7 @@ class HandleInertiaRequests extends Middleware
                     })
                     ->when($workspace, fn ($q) => $q->where('workspace_id', $workspace->id))
                     ->orderBy('name')
-                    ->get(['id', 'name', 'key', 'color'])
+                    ->get(['id', 'uuid', 'name', 'key', 'color'])
                 : [],
             'inbox_count' => $user
                 ? app(\App\Services\InboxService::class)->build($user)->count()

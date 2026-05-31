@@ -97,7 +97,7 @@ async function handleRequest() {
   if (requested.value || submitting.value || !props.task?.id) return
   submitting.value = true
   try {
-    await axios.post(route('tasks.access-requests.store', props.task.id))
+    await axios.post(route('tasks.access-requests.store', props.task.uuid))
     requested.value = true
     toast('Access request sent')
     emit('request', props.task)

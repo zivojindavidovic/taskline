@@ -64,7 +64,7 @@ class TaskTest extends TestCase
         $this->createTask(['key' => 'TST-2', 'title' => 'Another task']);
 
         $this->actingAs($this->owner)
-            ->getJson("/api/projects/{$this->project->id}/tasks")
+            ->getJson("/api/projects/{$this->project->uuid}/tasks")
             ->assertOk()
             ->assertJsonCount(2);
     }
@@ -76,7 +76,7 @@ class TaskTest extends TestCase
         $this->createTask(['key' => 'TST-2', 'sprint_id' => $sprint2->id, 'title' => 'Other sprint']);
 
         $this->actingAs($this->owner)
-            ->getJson("/api/projects/{$this->project->id}/tasks?sprint_id={$this->sprint->id}")
+            ->getJson("/api/projects/{$this->project->uuid}/tasks?sprint_id={$this->sprint->id}")
             ->assertOk()
             ->assertJsonCount(1)
             ->assertJsonFragment(['title' => 'Test Task']);
@@ -85,7 +85,7 @@ class TaskTest extends TestCase
     public function test_member_can_create_a_task(): void
     {
         $response = $this->actingAs($this->owner)->postJson(
-            "/api/projects/{$this->project->id}/tasks",
+            "/api/projects/{$this->project->uuid}/tasks",
             [
                 'title'           => 'Build login screen',
                 'priority'        => 'high',
@@ -111,7 +111,7 @@ class TaskTest extends TestCase
         $this->createTask(['key' => 'TST-2']);  // existing
 
         $response = $this->actingAs($this->owner)->postJson(
-            "/api/projects/{$this->project->id}/tasks",
+            "/api/projects/{$this->project->uuid}/tasks",
             [
                 'title'     => 'Third task',
                 'sprint_id' => $this->sprint->id,
@@ -124,7 +124,7 @@ class TaskTest extends TestCase
     public function test_task_creation_requires_title(): void
     {
         $this->actingAs($this->owner)
-            ->postJson("/api/projects/{$this->project->id}/tasks", ['sprint_id' => $this->sprint->id])
+            ->postJson("/api/projects/{$this->project->uuid}/tasks", ['sprint_id' => $this->sprint->id])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('title');
     }
@@ -134,7 +134,7 @@ class TaskTest extends TestCase
         $this->sprint->update(['locked' => true]);
 
         $this->actingAs($this->owner)
-            ->postJson("/api/projects/{$this->project->id}/tasks", [
+            ->postJson("/api/projects/{$this->project->uuid}/tasks", [
                 'title'     => 'New task',
                 'sprint_id' => $this->sprint->id,
             ])
@@ -146,7 +146,7 @@ class TaskTest extends TestCase
         $other = User::factory()->create();
 
         $this->actingAs($other)
-            ->postJson("/api/projects/{$this->project->id}/tasks", [
+            ->postJson("/api/projects/{$this->project->uuid}/tasks", [
                 'title'     => 'Hacked task',
                 'sprint_id' => $this->sprint->id,
             ])
@@ -158,7 +158,7 @@ class TaskTest extends TestCase
         $task = $this->createTask();
 
         $this->actingAs($this->owner)
-            ->getJson("/api/projects/{$this->project->id}/tasks/{$task->id}")
+            ->getJson("/api/projects/{$this->project->uuid}/tasks/{$task->uuid}")
             ->assertOk()
             ->assertJsonFragment(['title' => 'Test Task']);
     }
@@ -168,7 +168,7 @@ class TaskTest extends TestCase
         $task = $this->createTask();
 
         $this->actingAs($this->owner)
-            ->patchJson("/api/projects/{$this->project->id}/tasks/{$task->id}", [
+            ->patchJson("/api/projects/{$this->project->uuid}/tasks/{$task->uuid}", [
                 'title' => 'Updated title',
             ])
             ->assertOk()
@@ -186,7 +186,7 @@ class TaskTest extends TestCase
         $task = $this->createTask();
 
         $this->actingAs($this->owner)
-            ->patchJson("/api/projects/{$this->project->id}/tasks/{$task->id}", [
+            ->patchJson("/api/projects/{$this->project->uuid}/tasks/{$task->uuid}", [
                 'board_column_id' => $doneColumn->id,
             ])
             ->assertOk()
@@ -198,7 +198,7 @@ class TaskTest extends TestCase
         $task = $this->createTask();
 
         $this->actingAs($this->owner)
-            ->patchJson("/api/projects/{$this->project->id}/tasks/{$task->id}", [
+            ->patchJson("/api/projects/{$this->project->uuid}/tasks/{$task->uuid}", [
                 'completed' => true,
             ])
             ->assertOk()
@@ -218,7 +218,7 @@ class TaskTest extends TestCase
         $task->update(['completed_at' => now()]);
 
         $this->actingAs($this->owner)
-            ->patchJson("/api/projects/{$this->project->id}/tasks/{$task->id}", [
+            ->patchJson("/api/projects/{$this->project->uuid}/tasks/{$task->uuid}", [
                 'completed' => false,
             ])
             ->assertOk()
@@ -233,7 +233,7 @@ class TaskTest extends TestCase
         $task = $this->createTask();
 
         $this->actingAs($this->owner)
-            ->patchJson("/api/projects/{$this->project->id}/tasks/{$task->id}", [
+            ->patchJson("/api/projects/{$this->project->uuid}/tasks/{$task->uuid}", [
                 'title' => 'Attempted edit',
             ])
             ->assertUnprocessable();
@@ -244,7 +244,7 @@ class TaskTest extends TestCase
         $task = $this->createTask();
 
         $this->actingAs($this->owner)
-            ->deleteJson("/api/projects/{$this->project->id}/tasks/{$task->id}")
+            ->deleteJson("/api/projects/{$this->project->uuid}/tasks/{$task->uuid}")
             ->assertNoContent();
 
         $this->assertDatabaseMissing('tasks', ['id' => $task->id]);
@@ -256,7 +256,7 @@ class TaskTest extends TestCase
         $task = $this->createTask();
 
         $this->actingAs($this->owner)
-            ->deleteJson("/api/projects/{$this->project->id}/tasks/{$task->id}")
+            ->deleteJson("/api/projects/{$this->project->uuid}/tasks/{$task->uuid}")
             ->assertUnprocessable();
     }
 
@@ -265,7 +265,7 @@ class TaskTest extends TestCase
         $task = $this->createTask();
 
         $this->actingAs($this->owner)
-            ->patchJson("/api/projects/{$this->project->id}/tasks/{$task->id}", [
+            ->patchJson("/api/projects/{$this->project->uuid}/tasks/{$task->uuid}", [
                 'title' => 'Updated',
             ]);
 
@@ -280,7 +280,7 @@ class TaskTest extends TestCase
         $task = $this->createTask();
 
         $this->actingAs($this->owner)
-            ->patchJson("/api/projects/{$this->project->id}/tasks/{$task->id}", [
+            ->patchJson("/api/projects/{$this->project->uuid}/tasks/{$task->uuid}", [
                 'completed' => true,
             ]);
 
@@ -295,7 +295,7 @@ class TaskTest extends TestCase
         Event::fake();
 
         $this->actingAs($this->owner)->postJson(
-            "/api/projects/{$this->project->id}/tasks",
+            "/api/projects/{$this->project->uuid}/tasks",
             [
                 'title'     => 'Broadcasted task',
                 'sprint_id' => $this->sprint->id,
@@ -311,7 +311,7 @@ class TaskTest extends TestCase
         $task = $this->createTask();
 
         $this->actingAs($this->owner)->patchJson(
-            "/api/projects/{$this->project->id}/tasks/{$task->id}",
+            "/api/projects/{$this->project->uuid}/tasks/{$task->uuid}",
             ['title' => 'Updated']
         );
 
@@ -324,7 +324,7 @@ class TaskTest extends TestCase
         $task = $this->createTask();
 
         $this->actingAs($this->owner)->deleteJson(
-            "/api/projects/{$this->project->id}/tasks/{$task->id}"
+            "/api/projects/{$this->project->uuid}/tasks/{$task->uuid}"
         );
 
         Event::assertDispatched(\App\Events\TaskDeleted::class);

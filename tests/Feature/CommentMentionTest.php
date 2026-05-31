@@ -86,7 +86,7 @@ class CommentMentionTest extends TestCase
     public function test_storing_comment_parses_mention_tokens(): void
     {
         $this->actingAs($this->owner)
-            ->post("/tasks/{$this->task->id}/comments", [
+            ->post("/tasks/{$this->task->uuid}/comments", [
                 'body' => "Hey @[Alice](user:{$this->alice->id}) take a look.",
             ])
             ->assertRedirect();
@@ -101,7 +101,7 @@ class CommentMentionTest extends TestCase
     public function test_storing_comment_parses_multiple_mentions(): void
     {
         $this->actingAs($this->owner)
-            ->post("/tasks/{$this->task->id}/comments", [
+            ->post("/tasks/{$this->task->uuid}/comments", [
                 'body' => "Ping @[Alice](user:{$this->alice->id}) and @[Bob](user:{$this->bob->id}).",
             ])
             ->assertRedirect();
@@ -116,7 +116,7 @@ class CommentMentionTest extends TestCase
     public function test_storing_comment_deduplicates_repeated_mentions(): void
     {
         $this->actingAs($this->owner)
-            ->post("/tasks/{$this->task->id}/comments", [
+            ->post("/tasks/{$this->task->uuid}/comments", [
                 'body' => "Hi @[Alice](user:{$this->alice->id}) cc @[Alice](user:{$this->alice->id}).",
             ])
             ->assertRedirect();
@@ -128,7 +128,7 @@ class CommentMentionTest extends TestCase
     public function test_storing_comment_drops_self_mention(): void
     {
         $this->actingAs($this->owner)
-            ->post("/tasks/{$this->task->id}/comments", [
+            ->post("/tasks/{$this->task->uuid}/comments", [
                 'body' => "Note to self @[Owner](user:{$this->owner->id}).",
             ])
             ->assertRedirect();
@@ -140,7 +140,7 @@ class CommentMentionTest extends TestCase
     public function test_storing_comment_drops_non_workspace_mention(): void
     {
         $this->actingAs($this->owner)
-            ->post("/tasks/{$this->task->id}/comments", [
+            ->post("/tasks/{$this->task->uuid}/comments", [
                 'body' => "Hello @[Outsider](user:{$this->outsider->id}).",
             ])
             ->assertRedirect();
@@ -152,7 +152,7 @@ class CommentMentionTest extends TestCase
     public function test_storing_comment_without_mentions_persists_no_rows(): void
     {
         $this->actingAs($this->owner)
-            ->post("/tasks/{$this->task->id}/comments", ['body' => 'plain text'])
+            ->post("/tasks/{$this->task->uuid}/comments", ['body' => 'plain text'])
             ->assertRedirect();
 
         $comment = TaskComment::firstOrFail();
@@ -170,7 +170,7 @@ class CommentMentionTest extends TestCase
         ]);
 
         $this->actingAs($this->alice)
-            ->post("/tasks/{$this->task->id}/comments/{$comment->id}/replies", [
+            ->post("/tasks/{$this->task->uuid}/comments/{$comment->id}/replies", [
                 'body' => "Thanks @[Bob](user:{$this->bob->id}).",
             ])
             ->assertRedirect();
@@ -189,7 +189,7 @@ class CommentMentionTest extends TestCase
         ]);
 
         $this->actingAs($this->alice)
-            ->post("/tasks/{$this->task->id}/comments/{$comment->id}/replies", [
+            ->post("/tasks/{$this->task->uuid}/comments/{$comment->id}/replies", [
                 'body' => "Me again @[Alice](user:{$this->alice->id}).",
             ])
             ->assertRedirect();
@@ -203,7 +203,7 @@ class CommentMentionTest extends TestCase
     public function test_mentionable_endpoint_returns_workspace_members_minus_current(): void
     {
         $resp = $this->actingAs($this->alice)
-            ->getJson("/tasks/{$this->task->id}/comments/mentionable-users")
+            ->getJson("/tasks/{$this->task->uuid}/comments/mentionable-users")
             ->assertOk()
             ->json();
 
@@ -217,7 +217,7 @@ class CommentMentionTest extends TestCase
     public function test_mentionable_endpoint_blocks_non_member(): void
     {
         $this->actingAs($this->outsider)
-            ->getJson("/tasks/{$this->task->id}/comments/mentionable-users")
+            ->getJson("/tasks/{$this->task->uuid}/comments/mentionable-users")
             ->assertForbidden();
     }
 
@@ -225,7 +225,7 @@ class CommentMentionTest extends TestCase
 
     public function test_storing_comment_requires_auth(): void
     {
-        $this->post("/tasks/{$this->task->id}/comments", ['body' => 'hi'])
+        $this->post("/tasks/{$this->task->uuid}/comments", ['body' => 'hi'])
             ->assertRedirect('/login');
     }
 
@@ -234,7 +234,7 @@ class CommentMentionTest extends TestCase
     public function test_outsider_cannot_comment(): void
     {
         $this->actingAs($this->outsider)
-            ->post("/tasks/{$this->task->id}/comments", [
+            ->post("/tasks/{$this->task->uuid}/comments", [
                 'body' => "Hi @[Alice](user:{$this->alice->id}).",
             ])
             ->assertForbidden();
@@ -248,7 +248,7 @@ class CommentMentionTest extends TestCase
     {
         $body = "Hey @[Alice](user:{$this->alice->id}), see this.";
         $this->actingAs($this->owner)
-            ->post("/tasks/{$this->task->id}/comments", ['body' => $body])
+            ->post("/tasks/{$this->task->uuid}/comments", ['body' => $body])
             ->assertRedirect();
 
         $this->assertDatabaseHas('task_comments', [

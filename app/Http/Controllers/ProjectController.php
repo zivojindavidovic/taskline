@@ -95,13 +95,9 @@ class ProjectController extends Controller
             $project->boardColumns()->create($col);
         }
 
-        // Default sprint
-        $project->sprints()->create([
-            'name'       => 'Sprint 1',
-            'start_date' => now(),
-            'end_date'   => now()->addDays(14),
-            'status'     => 'active',
-        ]);
+        // No default sprint is created — a fresh project starts with only its
+        // backlog (tasks with sprint_id = NULL). Sprints are created explicitly
+        // by the user, matching the prototype where a new board has no sprint.
 
         \App\Models\AuditLog::create([
             'user_id'    => $user->id,
@@ -152,7 +148,12 @@ class ProjectController extends Controller
         $hasViewQuery = $request->has('sprint') || $request->has('backlog') || $request->has('all');
 
         if ($hasViewQuery) {
-            $sprintId  = $request->query('sprint');
+            // The URL exposes the sprint's uuid, never its integer id — resolve
+            // it back to the internal id the rest of this method works with.
+            $sprintUuid = $request->query('sprint');
+            $sprintId   = $sprintUuid
+                ? $project->sprints()->where('uuid', $sprintUuid)->value('id')
+                : null;
             $isBacklog = $request->query('backlog') === '1';
             $isAll     = $request->query('all') === '1';
         } else {
@@ -249,10 +250,10 @@ class ProjectController extends Controller
 
         $allProjects = $workspace->projects()
             ->orderBy('name')
-            ->get(['id', 'name', 'key', 'color']);
+            ->get(['id', 'uuid', 'name', 'key', 'color']);
 
         return Inertia::render('Projects/Show', [
-            'project'       => $project->only(['id', 'name', 'key', 'color']),
+            'project'       => $project->only(['id', 'uuid', 'name', 'key', 'color']),
             'currentSprint' => $sprint,
             'isBacklog'     => $isBacklog,
             'isAll'         => $isAll,

@@ -107,7 +107,7 @@ class ProjectTest extends TestCase
         $project = $this->createProjectForUser($user);
 
         $this->actingAs($user)
-            ->patchJson("/api/projects/{$project->id}", ['name' => 'Renamed'])
+            ->patchJson("/api/projects/{$project->uuid}", ['name' => 'Renamed'])
             ->assertOk()
             ->assertJsonFragment(['name' => 'Renamed']);
     }
@@ -119,7 +119,7 @@ class ProjectTest extends TestCase
         $project = $this->createProjectForUser($owner);
 
         $this->actingAs($other)
-            ->patchJson("/api/projects/{$project->id}", ['name' => 'Hacked'])
+            ->patchJson("/api/projects/{$project->uuid}", ['name' => 'Hacked'])
             ->assertForbidden();
     }
 
@@ -129,7 +129,7 @@ class ProjectTest extends TestCase
         $project = $this->createProjectForUser($user);
 
         $this->actingAs($user)
-            ->deleteJson("/api/projects/{$project->id}")
+            ->deleteJson("/api/projects/{$project->uuid}")
             ->assertNoContent();
 
         $this->assertDatabaseMissing('projects', ['id' => $project->id]);
@@ -143,7 +143,7 @@ class ProjectTest extends TestCase
         $project->members()->attach($member->id, ['role' => 'member']);
 
         $this->actingAs($member)
-            ->deleteJson("/api/projects/{$project->id}")
+            ->deleteJson("/api/projects/{$project->uuid}")
             ->assertForbidden();
     }
 }

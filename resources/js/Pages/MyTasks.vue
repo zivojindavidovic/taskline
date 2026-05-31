@@ -51,6 +51,6 @@ const openTasks = computed(() => props.tasks.filter(t => !t.completed))
 const activeTaskId = ref(null)
 
 function openTask(task) {
-  activeTaskId.value = task.id
+  activeTaskId.value = task.uuid
 }
 </script>

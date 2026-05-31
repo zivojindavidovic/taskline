@@ -6,9 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Concerns\HasUuidv7;
 
 class Task extends Model
 {
+    use HasUuidv7;
+
     protected $fillable = [
         'key', 'title', 'description',
         'project_id', 'sprint_id', 'board_column_id',

@@ -118,7 +118,7 @@ const activeTaskId = ref(null)
 const searchQuery = ref('')
 
 function openTask(task) {
-  activeTaskId.value = task.id
+  activeTaskId.value = task.uuid
 }
 
 function viewAllTasks() {

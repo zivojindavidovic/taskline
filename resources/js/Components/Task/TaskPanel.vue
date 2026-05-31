@@ -1102,7 +1102,7 @@ const participants = ref([])
 async function loadParticipants() {
   if (!props.task?.id) { participants.value = []; return }
   try {
-    const res = await fetch(route('tasks.participants', props.task.id), {
+    const res = await fetch(route('tasks.participants', props.task.uuid), {
       headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       credentials: 'same-origin',
     })
@@ -1133,7 +1133,7 @@ const resolvingAccess  = reactive({}) // { [id]: 'approved' | 'declined' }
 async function loadAccessRequests() {
   if (!props.task?.id) { accessRequests.value = []; canManageAccess.value = false; return }
   try {
-    const res = await fetch(route('tasks.access-requests.index', props.task.id), {
+    const res = await fetch(route('tasks.access-requests.index', props.task.uuid), {
       headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       credentials: 'same-origin',
     })
@@ -1155,7 +1155,7 @@ async function resolveAccess(req, approved) {
   const name = req.user?.name || 'them'
   try {
     const action = approved ? 'tasks.access-requests.approve' : 'tasks.access-requests.decline'
-    await axios.post(route(action, [props.task.id, req.id]))
+    await axios.post(route(action, [props.task.uuid, req.id]))
     // Brief resolved state reads before we drop the row.
     setTimeout(() => {
       accessRequests.value = accessRequests.value.filter(r => r.id !== req.id)

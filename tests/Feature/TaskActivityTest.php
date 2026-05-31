@@ -99,7 +99,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask(['title' => 'Old name']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['title' => 'New name'])
+            ->patch("/tasks/{$task->uuid}", ['title' => 'New name'])
             ->assertRedirect();
 
         $activities = $this->activitiesFor($task);
@@ -117,7 +117,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask(['description' => null]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['description' => 'A long description.'])
+            ->patch("/tasks/{$task->uuid}", ['description' => 'A long description.'])
             ->assertRedirect();
 
         $entry = $this->activitiesFor($task)->firstWhere('field', 'description');
@@ -131,7 +131,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask(['description' => 'something']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['description' => null])
+            ->patch("/tasks/{$task->uuid}", ['description' => null])
             ->assertRedirect();
 
         $entry = $this->activitiesFor($task)->firstWhere('field', 'description');
@@ -147,7 +147,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask(['priority' => 'med']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['priority' => 'urgent'])
+            ->patch("/tasks/{$task->uuid}", ['priority' => 'urgent'])
             ->assertRedirect();
 
         $entry = $this->activitiesFor($task)->firstWhere('field', 'priority');
@@ -164,7 +164,7 @@ class TaskActivityTest extends TestCase
         $task->assignees()->attach($this->alice->id);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['assignee_ids' => [$this->bob->id]])
+            ->patch("/tasks/{$task->uuid}", ['assignee_ids' => [$this->bob->id]])
             ->assertRedirect();
 
         $entry = $this->activitiesFor($task)->firstWhere('field', 'assignees');
@@ -181,7 +181,7 @@ class TaskActivityTest extends TestCase
         $task->assignees()->attach($this->alice->id);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['assignee_ids' => [$this->alice->id]])
+            ->patch("/tasks/{$task->uuid}", ['assignee_ids' => [$this->alice->id]])
             ->assertRedirect();
 
         $this->assertNull($this->activitiesFor($task)->firstWhere('field', 'assignees'));
@@ -201,7 +201,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask();
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['project_id' => $other->id])
+            ->patch("/tasks/{$task->uuid}", ['project_id' => $other->id])
             ->assertRedirect();
 
         $entry = $this->activitiesFor($task)->firstWhere('field', 'project');
@@ -217,7 +217,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask();
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['sprint_id' => null])
+            ->patch("/tasks/{$task->uuid}", ['sprint_id' => null])
             ->assertRedirect();
 
         $entry = $this->activitiesFor($task)->firstWhere('field', 'sprint');
@@ -231,7 +231,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask(['sprint_id' => null]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['sprint_id' => $this->sprint->id])
+            ->patch("/tasks/{$task->uuid}", ['sprint_id' => $this->sprint->id])
             ->assertRedirect();
 
         $entry = $this->activitiesFor($task)->firstWhere('field', 'sprint');
@@ -247,7 +247,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask();
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", [
+            ->patch("/tasks/{$task->uuid}", [
                 'start_date' => '2026-06-01',
                 'due_date'   => '2026-06-15',
             ])
@@ -270,7 +270,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask(['tags' => ['a']]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['tags' => ['a', 'b']])
+            ->patch("/tasks/{$task->uuid}", ['tags' => ['a', 'b']])
             ->assertRedirect();
 
         $entry = $this->activitiesFor($task)->firstWhere('field', 'tags');
@@ -286,7 +286,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask();
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$task->id}/complete")
+            ->post("/tasks/{$task->uuid}/complete")
             ->assertRedirect();
 
         $entry = $this->activitiesFor($task)->firstWhere('field', 'status');
@@ -300,7 +300,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask(['completed' => true, 'completed_at' => now(), 'completed_by' => $this->owner->id]);
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$task->id}/uncomplete")
+            ->post("/tasks/{$task->uuid}/uncomplete")
             ->assertRedirect();
 
         $entry = $this->activitiesFor($task)->firstWhere('field', 'status');
@@ -320,7 +320,7 @@ class TaskActivityTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$parent->id}/subtasks/{$subtask->id}", ['title' => 'New subtask'])
+            ->patch("/tasks/{$parent->uuid}/subtasks/{$subtask->uuid}", ['title' => 'New subtask'])
             ->assertRedirect();
 
         $entry = TaskActivity::where('task_id', $parent->id)
@@ -338,7 +338,7 @@ class TaskActivityTest extends TestCase
         $subtask = $this->makeTask(['parent_task_id' => $parent->id, 'priority' => 'low']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$parent->id}/subtasks/{$subtask->id}", ['priority' => 'high'])
+            ->patch("/tasks/{$parent->uuid}/subtasks/{$subtask->uuid}", ['priority' => 'high'])
             ->assertRedirect();
 
         $entry = TaskActivity::where('subtask_id', $subtask->id)
@@ -354,7 +354,7 @@ class TaskActivityTest extends TestCase
         $subtask = $this->makeTask(['parent_task_id' => $parent->id]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$parent->id}/subtasks/{$subtask->id}", [
+            ->patch("/tasks/{$parent->uuid}/subtasks/{$subtask->uuid}", [
                 'start_date' => '2026-06-01',
                 'due_date'   => '2026-06-10',
             ])->assertRedirect();
@@ -369,7 +369,7 @@ class TaskActivityTest extends TestCase
         $subtask = $this->makeTask(['parent_task_id' => $parent->id]);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$parent->id}/subtasks/{$subtask->id}", [
+            ->patch("/tasks/{$parent->uuid}/subtasks/{$subtask->uuid}", [
                 'assignee_ids' => [$this->alice->id, $this->bob->id],
             ])->assertRedirect();
 
@@ -386,7 +386,7 @@ class TaskActivityTest extends TestCase
         $subtask = $this->makeTask(['parent_task_id' => $parent->id]);
 
         $this->actingAs($this->owner)
-            ->post("/tasks/{$subtask->id}/complete")
+            ->post("/tasks/{$subtask->uuid}/complete")
             ->assertRedirect();
 
         $entry = TaskActivity::where('task_id', $parent->id)
@@ -403,7 +403,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask(['title' => 'Old', 'priority' => 'low']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", [
+            ->patch("/tasks/{$task->uuid}", [
                 'title'    => 'New',
                 'priority' => 'high',
                 'tags'     => ['x'],
@@ -422,7 +422,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask(['title' => 'Same']);
 
         $this->actingAs($this->owner)
-            ->patch("/tasks/{$task->id}", ['title' => 'Same'])
+            ->patch("/tasks/{$task->uuid}", ['title' => 'Same'])
             ->assertRedirect();
 
         $this->assertNull($this->activitiesFor($task)->firstWhere('field', 'title'));
@@ -435,7 +435,7 @@ class TaskActivityTest extends TestCase
         $task = $this->makeTask(['title' => 'Foo']);
 
         $this->actingAs($this->bob)
-            ->patch("/tasks/{$task->id}", ['title' => 'Bar'])
+            ->patch("/tasks/{$task->uuid}", ['title' => 'Bar'])
             ->assertRedirect();
 
         $entry = $this->activitiesFor($task)->firstWhere('field', 'title');

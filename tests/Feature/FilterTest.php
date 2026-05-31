@@ -80,7 +80,7 @@ class FilterTest extends TestCase
     public function test_get_filters_returns_empty_defaults_when_no_filters_saved(): void
     {
         $response = $this->actingAs($this->owner)
-            ->getJson("/projects/{$this->project->id}/filters");
+            ->getJson("/projects/{$this->project->uuid}/filters");
 
         $response->assertOk()->assertJson([
             'sprint_ids'     => [],
@@ -105,7 +105,7 @@ class FilterTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->owner)
-            ->getJson("/projects/{$this->project->id}/filters");
+            ->getJson("/projects/{$this->project->uuid}/filters");
 
         $response->assertOk()->assertJson([
             'sprint_ids'   => [$this->sprint->id],
@@ -128,14 +128,14 @@ class FilterTest extends TestCase
         ]);
 
         $response = $this->actingAs($otherUser)
-            ->getJson("/projects/{$this->project->id}/filters");
+            ->getJson("/projects/{$this->project->uuid}/filters");
 
         $response->assertOk()->assertJson(['priorities' => []]);
     }
 
     public function test_get_filters_requires_authentication(): void
     {
-        $this->getJson("/projects/{$this->project->id}/filters")
+        $this->getJson("/projects/{$this->project->uuid}/filters")
             ->assertUnauthorized();
     }
 
@@ -144,7 +144,7 @@ class FilterTest extends TestCase
         $stranger = User::factory()->create();
 
         $this->actingAs($stranger)
-            ->getJson("/projects/{$this->project->id}/filters")
+            ->getJson("/projects/{$this->project->uuid}/filters")
             ->assertForbidden();
     }
 
@@ -161,7 +161,7 @@ class FilterTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'sprint_ids' => [$this->sprint->id, $sprint2->id],
             ]);
 
@@ -182,7 +182,7 @@ class FilterTest extends TestCase
         $this->project->members()->attach($member->id, ['role' => 'member']);
 
         $response = $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'assignee_ids' => [$member->id],
             ]);
 
@@ -194,7 +194,7 @@ class FilterTest extends TestCase
     public function test_save_priority_filter(): void
     {
         $response = $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'priorities' => ['high', 'urgent'],
             ]);
 
@@ -213,7 +213,7 @@ class FilterTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'status_ids' => [$this->column->id, $column2->id],
             ]);
 
@@ -225,7 +225,7 @@ class FilterTest extends TestCase
     public function test_save_statuses_filter(): void
     {
         $response = $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'statuses' => ['open', 'completed'],
             ]);
 
@@ -237,7 +237,7 @@ class FilterTest extends TestCase
     public function test_save_hide_completed_filter(): void
     {
         $response = $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'hide_completed' => true,
             ]);
 
@@ -249,7 +249,7 @@ class FilterTest extends TestCase
     public function test_save_unassigned_filter(): void
     {
         $response = $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'unassigned' => true,
             ]);
 
@@ -261,7 +261,7 @@ class FilterTest extends TestCase
     public function test_save_combined_filters(): void
     {
         $response = $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'sprint_ids'     => [$this->sprint->id],
                 'assignee_ids'   => [$this->owner->id],
                 'priorities'     => ['low', 'med'],
@@ -291,7 +291,7 @@ class FilterTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'priorities' => [],
             ])
             ->assertOk()
@@ -301,14 +301,14 @@ class FilterTest extends TestCase
     public function test_filters_persist_across_requests(): void
     {
         $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'priorities'     => ['urgent'],
                 'hide_completed' => true,
                 'unassigned'     => true,
             ]);
 
         $response = $this->actingAs($this->owner)
-            ->getJson("/projects/{$this->project->id}/filters");
+            ->getJson("/projects/{$this->project->uuid}/filters");
 
         $response->assertOk()->assertJson([
             'priorities'     => ['urgent'],
@@ -326,7 +326,7 @@ class FilterTest extends TestCase
         ]);
 
         $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'priorities' => ['high', 'urgent'],
             ])
             ->assertOk()
@@ -347,24 +347,24 @@ class FilterTest extends TestCase
         $project2->members()->attach($this->owner->id, ['role' => 'owner']);
 
         $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", ['priorities' => ['high']]);
+            ->putJson("/projects/{$this->project->uuid}/filters", ['priorities' => ['high']]);
 
         $this->actingAs($this->owner)
-            ->putJson("/projects/{$project2->id}/filters", ['priorities' => ['low']]);
+            ->putJson("/projects/{$project2->uuid}/filters", ['priorities' => ['low']]);
 
         $this->actingAs($this->owner)
-            ->getJson("/projects/{$this->project->id}/filters")
+            ->getJson("/projects/{$this->project->uuid}/filters")
             ->assertJson(['priorities' => ['high']]);
 
         $this->actingAs($this->owner)
-            ->getJson("/projects/{$project2->id}/filters")
+            ->getJson("/projects/{$project2->uuid}/filters")
             ->assertJson(['priorities' => ['low']]);
     }
 
     public function test_invalid_priority_value_is_rejected(): void
     {
         $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'priorities' => ['invalid_priority'],
             ])
             ->assertUnprocessable()
@@ -374,7 +374,7 @@ class FilterTest extends TestCase
     public function test_invalid_status_value_is_rejected(): void
     {
         $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'statuses' => ['invalid_status'],
             ])
             ->assertUnprocessable()
@@ -384,7 +384,7 @@ class FilterTest extends TestCase
     public function test_non_array_sprint_ids_is_rejected(): void
     {
         $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'sprint_ids' => 'not-an-array',
             ])
             ->assertUnprocessable()
@@ -394,7 +394,7 @@ class FilterTest extends TestCase
     public function test_non_integer_assignee_id_is_rejected(): void
     {
         $this->actingAs($this->owner)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'assignee_ids' => ['not-an-integer'],
             ])
             ->assertUnprocessable()
@@ -406,7 +406,7 @@ class FilterTest extends TestCase
         $stranger = User::factory()->create();
 
         $this->actingAs($stranger)
-            ->putJson("/projects/{$this->project->id}/filters", [
+            ->putJson("/projects/{$this->project->uuid}/filters", [
                 'priorities' => ['high'],
             ])
             ->assertForbidden();
@@ -414,7 +414,7 @@ class FilterTest extends TestCase
 
     public function test_save_filters_requires_authentication(): void
     {
-        $this->putJson("/projects/{$this->project->id}/filters", [
+        $this->putJson("/projects/{$this->project->uuid}/filters", [
             'priorities' => ['high'],
         ])->assertUnauthorized();
     }
@@ -434,7 +434,7 @@ class FilterTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}");
+            ->get("/projects/{$this->project->uuid}");
 
         $response->assertOk();
         $savedFilters = $response->original->getData()['page']['props']['savedFilters'];
@@ -446,7 +446,7 @@ class FilterTest extends TestCase
     public function test_project_show_passes_empty_saved_filters_when_none_set(): void
     {
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}");
+            ->get("/projects/{$this->project->uuid}");
 
         $response->assertOk();
         $savedFilters = $response->original->getData()['page']['props']['savedFilters'];
@@ -471,7 +471,7 @@ class FilterTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}?all=1");
+            ->get("/projects/{$this->project->uuid}?all=1");
 
         $response->assertOk();
         $taskIds = collect($response->original->getData()['page']['props']['tasks'])->pluck('id');
@@ -485,7 +485,7 @@ class FilterTest extends TestCase
         $task2 = $this->createTask(['priority' => 'low']);
 
         $response = $this->actingAs($this->owner)
-            ->get("/projects/{$this->project->id}?all=1");
+            ->get("/projects/{$this->project->uuid}?all=1");
 
         $response->assertOk();
         $taskIds = collect($response->original->getData()['page']['props']['tasks'])->pluck('id');
