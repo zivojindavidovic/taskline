@@ -279,4 +279,70 @@ class CommentBroadcastingTest extends TestCase
 
         Event::assertNotDispatched(ReplyAdded::class);
     }
+
+    // ---------- Replies on a SUBTASK comment ----------
+
+    private function makeSubtask(): Task
+    {
+        return Task::create([
+            'key'             => 'PRJ-2',
+            'title'           => 'Subtask',
+            'project_id'      => $this->project->id,
+            'sprint_id'       => $this->sprint->id,
+            'board_column_id' => $this->column->id,
+            'parent_task_id'  => $this->task->id,
+            'created_by'      => $this->owner->id,
+            'priority'        => 'med',
+        ]);
+    }
+
+    public function test_replying_to_a_subtask_comment_persists_and_dispatches_reply_added(): void
+    {
+        Event::fake([ReplyAdded::class]);
+
+        $subtask = $this->makeSubtask();
+        $comment = TaskComment::create([
+            'task_id' => $subtask->id,
+            'user_id' => $this->alice->id,
+            'body'    => 'parent on subtask',
+        ]);
+
+        $this->actingAs($this->bob)
+            ->post(route('tasks.comments.reply', [$subtask, $comment]), ['body' => 'subtask reply'])
+            ->assertRedirect();
+
+        // Persisted against the subtask's comment.
+        $this->assertDatabaseHas('comment_replies', [
+            'task_comment_id' => $comment->id,
+            'user_id'         => $this->bob->id,
+            'body'            => 'subtask reply',
+        ]);
+
+        // Broadcast carries the subtask as the task (so listeners append to it).
+        Event::assertDispatched(ReplyAdded::class, function (ReplyAdded $e) use ($subtask, $comment) {
+            return $e->task->id === $subtask->id
+                && $e->reply->task_comment_id === $comment->id
+                && $e->reply->body === 'subtask reply';
+        });
+    }
+
+    public function test_subtask_comment_reply_broadcasts_on_parent_project_channel(): void
+    {
+        $subtask = $this->makeSubtask();
+        $comment = TaskComment::create([
+            'task_id' => $subtask->id,
+            'user_id' => $this->alice->id,
+            'body'    => 'parent',
+        ]);
+        $reply = CommentReply::create([
+            'task_comment_id' => $comment->id,
+            'user_id'         => $this->bob->id,
+            'body'            => 'reply',
+        ]);
+
+        $channels = (new ReplyAdded($subtask, $reply))->broadcastOn();
+
+        $this->assertCount(1, $channels);
+        $this->assertSame('private-project.' . $this->project->id, $channels[0]->name);
+    }
 }

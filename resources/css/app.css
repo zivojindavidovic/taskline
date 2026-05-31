@@ -382,6 +382,17 @@ input, textarea, select { font-family: inherit; color: var(--fg); }
 .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .input::placeholder { color: var(--fg-subtle); }
 
+/* Multi-line variant. Global (not scoped) so it reaches the <textarea> inside
+   MentionTextarea — overrides .input's fixed 32px height for comment composers. */
+.textarea {
+  display: block;
+  height: auto;
+  min-height: 64px;
+  padding: 8px 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
 /* ── Menus ───────────────────────────────────────────────────────────── */
 .menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
 

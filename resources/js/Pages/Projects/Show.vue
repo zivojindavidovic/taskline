@@ -320,6 +320,7 @@
       @subtaskRemove="removeSubtask"
       @subtaskUpdate="handleSubtaskUpdate"
       @subtaskComment="postSubtaskComment"
+      @subtaskReply="postSubtaskReply"
       @attachmentUpload="uploadAttachment"
       @attachmentRemove="removeAttachment"
     />
@@ -582,6 +583,7 @@ onMounted(() => {
     })
     .listen('ReplyAdded', ({ task_id, comment_id, reply }) => {
       const appendReply = (task) => {
+        if (!task) return
         const comment = (task.comments ?? []).find(c => c.id === comment_id)
         if (!comment) return
         comment.replies = comment.replies ?? []
@@ -589,9 +591,15 @@ onMounted(() => {
           comment.replies.push(reply)
         }
       }
-      const task = localTasks.value.find(t => t.id === task_id)
-      if (task) appendReply(task)
-      if (activeTask.value?.id === task_id) appendReply(activeTask.value)
+      // task_id may be a subtask id — replies live on the subtask itself, which
+      // is nested under its parent, so look one level down as well.
+      const findTask = (root) => {
+        if (!root) return null
+        if (root.id === task_id) return root
+        return (root.subtasks ?? []).find(s => s.id === task_id) ?? null
+      }
+      localTasks.value.forEach(t => appendReply(findTask(t)))
+      appendReply(findTask(activeTask.value))
     })
     // Board structure changed elsewhere — a column was added/renamed/removed,
     // or a sprint was created/locked/unlocked/completed/reopened. Re-pull just
@@ -855,6 +863,10 @@ function postComment(body) {
 
 function postSubtaskComment(subtaskId, body) {
   router.post(route('tasks.comments.store', subtaskId), { body }, { preserveScroll: true })
+}
+
+function postSubtaskReply(subtaskId, commentId, body) {
+  router.post(route('tasks.comments.reply', [subtaskId, commentId]), { body }, { preserveScroll: true })
 }
 
 function postReply(commentId, body) {

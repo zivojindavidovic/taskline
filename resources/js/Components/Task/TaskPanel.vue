@@ -843,17 +843,59 @@
 
         <!-- Subtask Comments -->
         <div class="panel-section">
-          <div class="panel-section-title">Comments</div>
+          <div class="minitabs">
+            <button type="button" class="minitab active">
+              Comments <span class="badge">{{ openSubtaskComments.length }}</span>
+            </button>
+          </div>
           <div class="vstack">
             <p v-if="!openSubtaskComments.length" class="muted small-pad">No comments yet.</p>
-            <div v-for="c in openSubtaskComments" :key="c.id" class="comment">
-              <Avatar :name="c.author ?? c.user?.name" size="sm" />
-              <div class="body">
-                <div class="author-row">
-                  <span class="author">{{ c.author ?? c.user?.name }}</span>
-                  <span class="time">{{ c.time ?? formatAgo(c.created_at) }}</span>
+            <div v-for="c in openSubtaskComments" :key="c.id">
+              <div class="comment">
+                <Avatar :name="c.author ?? c.user?.name" size="sm" />
+                <div class="body">
+                  <div class="author-row">
+                    <span class="author">{{ c.author ?? c.user?.name }}</span>
+                    <span class="time">{{ c.time ?? formatAgo(c.created_at) }}</span>
+                  </div>
+                  <div class="text" v-html="renderCommentBody(c.body)" />
+                  <div v-if="!locked" class="actions">
+                    <button type="button" @click="subtaskReplyingTo = subtaskReplyingTo === c.id ? null : c.id">Reply</button>
+                  </div>
                 </div>
-                <div class="text" v-html="renderCommentBody(c.body)" />
+              </div>
+
+              <div v-if="c.replies?.length || subtaskReplyingTo === c.id" class="thread-replies">
+                <div v-for="r in c.replies" :key="r.id" class="comment">
+                  <Avatar :name="r.user?.name" size="sm" />
+                  <div class="body">
+                    <div class="author-row">
+                      <span class="author">{{ r.user?.name }}</span>
+                      <span class="time">{{ formatAgo(r.created_at) }}</span>
+                    </div>
+                    <div class="text" v-html="renderCommentBody(r.body)" />
+                  </div>
+                </div>
+
+                <div v-if="subtaskReplyingTo === c.id" class="composer">
+                  <Avatar :name="currentUser?.name" size="sm" />
+                  <div class="body">
+                    <MentionTextarea
+                      v-model="subtaskReplyText"
+                      :users="mentionableUsers"
+                      :placeholder="`Reply to ${c.user?.name ?? ''}…`"
+                    />
+                    <div class="hstack-end">
+                      <button type="button" class="btn ghost sm" @click="subtaskReplyingTo = null; subtaskReplyText = ''">Cancel</button>
+                      <button
+                        type="button"
+                        class="btn primary sm"
+                        :disabled="!subtaskReplyText.trim()"
+                        @click="submitSubtaskReply(c.id)"
+                      >Reply</button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             <div v-if="!locked" class="composer">
@@ -910,7 +952,7 @@ const props = defineProps({
 const emit = defineEmits([
   'close', 'update', 'comment', 'reply',
   'complete', 'uncomplete', 'delete',
-  'subtask', 'subtaskToggle', 'subtaskRemove', 'subtaskUpdate', 'subtaskComment',
+  'subtask', 'subtaskToggle', 'subtaskRemove', 'subtaskUpdate', 'subtaskComment', 'subtaskReply',
   'attachmentUpload', 'attachmentRemove',
 ])
 
@@ -1160,6 +1202,18 @@ function submitSubtaskComment() {
   // handles the POST + refetch so the new comment lands on the subtask.
   emit('subtaskComment', openSubtask.value.id, body)
   subtaskNewComment.value = ''
+}
+
+const subtaskReplyingTo = ref(null)
+const subtaskReplyText  = ref('')
+function submitSubtaskReply(commentId) {
+  const body = subtaskReplyText.value.trim()
+  if (!body || !openSubtask.value) return
+  // Replies route through tasks.comments.reply with the subtask's id (a subtask
+  // IS a Task), so ReplyAdded broadcasts just like a top-level comment reply.
+  emit('subtaskReply', openSubtask.value.id, commentId, body)
+  subtaskReplyText.value = ''
+  subtaskReplyingTo.value = null
 }
 
 const subtaskAllTagOptions = computed(() => {
