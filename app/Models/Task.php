@@ -91,4 +91,39 @@ class Task extends Model
     {
         return $this->hasMany(TaskAttachment::class)->latest();
     }
+
+    public function accessRequests(): HasMany
+    {
+        return $this->hasMany(TaskAccessRequest::class)->latest();
+    }
+
+    /**
+     * Single source of truth for "can this user see this task".
+     *
+     * Access is task-level: a user qualifies if they own or are a member of the
+     * project, OR they hold an approved access request for *this specific task*.
+     * An approved request is the grant itself — we never widen it to project
+     * membership, so a grantee gets exactly one task and nothing else.
+     */
+    public function isAccessibleBy(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        $project = $this->project;
+
+        return $project->owner_id === $user->id
+            || $project->members()->where('users.id', $user->id)->exists()
+            || $this->hasApprovedAccessFor($user->id);
+    }
+
+    /** Whether the given user holds an approved task-level grant for this task. */
+    public function hasApprovedAccessFor(int $userId): bool
+    {
+        return $this->accessRequests()
+            ->where('user_id', $userId)
+            ->where('status', TaskAccessRequest::STATUS_APPROVED)
+            ->exists();
+    }
 }

@@ -113,7 +113,11 @@ class CommentMentionService
     {
         $candidates = $this->extractMentionedIds($comment->body);
         $allowed    = $this->filterToProjectMembers($project, (int) $comment->user_id, $candidates);
-        return $this->repository->syncForComment($comment, $allowed);
+        $persisted  = $this->repository->syncForComment($comment, $allowed);
+
+        $this->notifyMentioned($persisted);
+
+        return $persisted;
     }
 
     /**
@@ -123,6 +127,24 @@ class CommentMentionService
     {
         $candidates = $this->extractMentionedIds($reply->body);
         $allowed    = $this->filterToProjectMembers($project, (int) $reply->user_id, $candidates);
-        return $this->repository->syncForReply($reply, $allowed);
+        $persisted  = $this->repository->syncForReply($reply, $allowed);
+
+        $this->notifyMentioned($persisted);
+
+        return $persisted;
+    }
+
+    /**
+     * Ping the inbox of every freshly-mentioned user. The author is already
+     * filtered out upstream, so everyone here is someone else. The inbox is
+     * derived on read — the event is purely a refresh trigger.
+     *
+     * @param  array<int>  $userIds
+     */
+    private function notifyMentioned(array $userIds): void
+    {
+        foreach (array_unique(array_map('intval', $userIds)) as $userId) {
+            broadcast(new \App\Events\InboxNotificationSent($userId, 'mention'))->toOthers();
+        }
     }
 }

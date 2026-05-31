@@ -154,7 +154,11 @@ class TaskController extends Controller
      */
     public function details(Task $task): JsonResponse
     {
-        $this->authorizeTaskAccess($task);
+        // Non-members get a redacted "request access" payload (403) instead of
+        // a bare error, so the panel can render the locked preview.
+        if (! $this->canAccessTask($task)) {
+            return $this->noAccessPayload($task);
+        }
 
         $task->load([
             'assignee:id,name,email,avatar_color',
@@ -326,13 +330,49 @@ class TaskController extends Controller
 
     private function authorizeTaskAccess(Task $task): void
     {
-        $user    = auth()->user();
+        abort_unless($this->canAccessTask($task), 403);
+    }
+
+    /**
+     * A user can view a task if they own/are a member of its project, or hold an
+     * approved task-level access grant. Delegates to the model so the rule lives
+     * in one place (Task::isAccessibleBy).
+     */
+    private function canAccessTask(Task $task): bool
+    {
+        return $task->isAccessibleBy(auth()->user());
+    }
+
+    /**
+     * Redacted payload for a user without access. Carries just enough to render
+     * the locked preview — task key, project name, who can approve, and the
+     * status of any request this user already made. Real content is withheld.
+     */
+    private function noAccessPayload(Task $task): JsonResponse
+    {
         $project = $task->project;
-        abort_unless(
-            $project->owner_id === $user->id ||
-            $project->members()->where('users.id', $user->id)->exists(),
-            403
-        );
+
+        $pending = $task->accessRequests()
+            ->where('user_id', auth()->id())
+            ->first(['id', 'status', 'created_at']);
+
+        $approvers = $project->members()
+            ->wherePivotIn('role', ['owner', 'admin'])
+            ->get(['users.id', 'users.name', 'users.avatar_color']);
+
+        if (! $approvers->contains('id', $project->owner_id) && $project->owner) {
+            $approvers = collect([$project->owner])
+                ->map(fn ($o) => $o->only(['id', 'name', 'avatar_color']))
+                ->concat($approvers);
+        }
+
+        return response()->json([
+            'hasAccess'      => false,
+            'task'           => $task->only(['id', 'key']),
+            'project'        => $project->only(['id', 'name', 'key', 'color']),
+            'approvers'      => $approvers->values(),
+            'pendingRequest' => $pending,
+        ], 403);
     }
 
     private function workspaceUserIds(Project $project): array

@@ -587,6 +587,16 @@ onMounted(() => {
       if (task) appendReply(task)
       if (activeTask.value?.id === task_id) appendReply(activeTask.value)
     })
+    // Board structure changed elsewhere — a column was added/renamed/removed,
+    // or a sprint was created/locked/unlocked/completed/reopened. Re-pull just
+    // the affected board props instead of mutating the grid by hand;
+    // preserveState keeps the open panel, scroll position, and filters intact.
+    .listen('BoardColumnUpdated', () => {
+      router.reload({ only: ['columns'], preserveScroll: true, preserveState: true })
+    })
+    .listen('SprintUpdated', () => {
+      router.reload({ only: ['sprints', 'currentSprint', 'tasks'], preserveScroll: true, preserveState: true })
+    })
 })
 onUnmounted(() => window.Echo.leave(`project.${props.project.id}`))
 

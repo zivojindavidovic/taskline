@@ -64,9 +64,41 @@ class InboxService
             ->values();
     }
 
+    /**
+     * Project ids the user can access (owns or is a member of). Used to flag
+     * mentions that point at tasks in projects the user isn't part of — the
+     * only way an inbox row can reference a task the user can't yet open.
+     */
+    private function accessibleProjectIds(int $userId): Collection
+    {
+        return collect()
+            ->merge(\App\Models\Project::where('owner_id', $userId)->pluck('id'))
+            ->merge(DB::table('workspace_members')->where('user_id', $userId)->pluck('project_id'))
+            ->unique()
+            ->values();
+    }
+
+    /**
+     * Tasks the user holds an approved task-level grant for. A mention pointing
+     * at one of these is NOT restricted even when the user can't see the project —
+     * the grant lets them open exactly that task.
+     */
+    private function grantedTaskIds(int $userId): Collection
+    {
+        return DB::table('task_access_requests')
+            ->where('user_id', $userId)
+            ->where('status', 'approved')
+            ->pluck('task_id')
+            ->unique()
+            ->values();
+    }
+
     /** Someone @-mentioned the user in a comment or reply. */
     private function mentions(int $userId): Collection
     {
+        $accessibleProjectIds = $this->accessibleProjectIds($userId);
+        $grantedTaskIds       = $this->grantedTaskIds($userId);
+
         return CommentMention::where('user_id', $userId)
             ->with([
                 'taskComment.user:id,name',
@@ -79,7 +111,7 @@ class InboxService
             ->latest()
             ->take(40)
             ->get()
-            ->map(function (CommentMention $m) {
+            ->map(function (CommentMention $m) use ($accessibleProjectIds, $grantedTaskIds) {
                 $source = $m->taskComment ?: $m->commentReply;
                 $task   = $m->taskComment
                     ? $m->taskComment->task
@@ -97,6 +129,8 @@ class InboxService
                     $task,
                     $this->clean($source->body),
                     $m->created_at,
+                    ! $accessibleProjectIds->contains($task->project_id)
+                        && ! $grantedTaskIds->contains($task->id),
                 );
             })
             ->filter();
@@ -210,7 +244,7 @@ class InboxService
     }
 
     /** Shape one notification row for the frontend. */
-    private function item(string $id, string $type, ?string $actor, string $verb, Task $task, ?string $excerpt, $createdAt): array
+    private function item(string $id, string $type, ?string $actor, string $verb, Task $task, ?string $excerpt, $createdAt, bool $restricted = false): array
     {
         return [
             'id'         => $id,
@@ -222,6 +256,7 @@ class InboxService
             'time'       => $createdAt?->diffForHumans(),
             'task_id'    => $task->id,
             'project_id' => $task->project_id,
+            'restricted' => $restricted,
             'created_at' => $createdAt,
         ];
     }

@@ -299,6 +299,16 @@ onMounted(() => {
       const row = localPending.value.find(p => p.id === invitation_id)
       if (row) row.projectAccess = Array.isArray(project_access) ? [...project_access] : []
     })
+    // Roster changed (member added/invited/role-updated/removed, invite revoked)
+    // — re-pull members + pending so every admin's table stays in sync.
+    .listen('WorkspaceMembersChanged', () => {
+      router.reload({ only: ['members', 'pending'], preserveScroll: true, preserveState: true })
+    })
+    // A new project appeared in this workspace — refresh the project list that
+    // backs the per-member access matrix.
+    .listen('ProjectCreated', () => {
+      router.reload({ only: ['members', 'pending', 'projects'], preserveScroll: true, preserveState: true })
+    })
 })
 
 onBeforeUnmount(() => {

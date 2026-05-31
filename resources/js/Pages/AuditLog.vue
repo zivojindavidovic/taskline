@@ -308,8 +308,30 @@ const vClickOutside = {
 
 // Close menu on Esc
 function onKey(e) { if (e.key === 'Escape') closeMenu() }
-onMounted(() => document.addEventListener('keydown', onKey))
-onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
+
+// Realtime: audit entries always broadcast on their project channel. The log is
+// workspace-wide, so subscribe to every project the viewer can see and re-pull
+// the (filtered, paginated) list whenever a new entry lands anywhere.
+const auditChannels = []
+function subscribeToAuditChannels() {
+  if (!window.Echo) return
+  for (const p of props.projects) {
+    const name = `project.${p.id}`
+    window.Echo.private(name).listen('AuditLogRecorded', () => {
+      router.reload({ only: ['logs'], preserveScroll: true, preserveState: true })
+    })
+    auditChannels.push(name)
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', onKey)
+  subscribeToAuditChannels()
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onKey)
+  if (window.Echo) auditChannels.forEach(name => window.Echo.leave(name))
+})
 </script>
 
 <style scoped>

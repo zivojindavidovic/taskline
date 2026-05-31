@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\ProjectCreated;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\FilterService;
@@ -70,6 +71,8 @@ class ProjectController extends Controller
             'action'     => 'project.created',
             'meta'       => ['name' => $project->name],
         ]);
+
+        broadcast(new ProjectCreated($project))->toOthers();
 
         return redirect()->route('projects.show', $project)
             ->with('success', "Project \"{$project->name}\" created.");

@@ -16,6 +16,7 @@ use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\TaskAttachmentController;
 use App\Http\Controllers\FilterController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskAccessRequestController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('dashboard'));
@@ -71,6 +72,12 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::patch('/tasks/{task}/subtasks/{subtask}', [TaskController::class, 'updateSubtask'])->name('tasks.subtasks.update');
     Route::get('/tasks/{task}/participants', [TaskController::class, 'participants'])->name('tasks.participants');
     Route::get('/tasks/{task}/details', [TaskController::class, 'details'])->name('tasks.details');
+
+    // Task access requests
+    Route::get('/tasks/{task}/access-requests', [TaskAccessRequestController::class, 'index'])->name('tasks.access-requests.index');
+    Route::post('/tasks/{task}/access-requests', [TaskAccessRequestController::class, 'store'])->name('tasks.access-requests.store');
+    Route::post('/tasks/{task}/access-requests/{accessRequest}/approve', [TaskAccessRequestController::class, 'approve'])->name('tasks.access-requests.approve');
+    Route::post('/tasks/{task}/access-requests/{accessRequest}/decline', [TaskAccessRequestController::class, 'decline'])->name('tasks.access-requests.decline');
     Route::post('/tasks/{task}/attachments', [TaskAttachmentController::class, 'store'])->name('tasks.attachments.store');
     Route::delete('/attachments/{attachment}', [TaskAttachmentController::class, 'destroy'])->name('attachments.destroy');
 

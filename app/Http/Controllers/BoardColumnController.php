@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\BoardColumnUpdated;
 use App\Models\AuditLog;
 use App\Models\BoardColumn;
 use App\Models\Project;
@@ -31,6 +32,8 @@ class BoardColumnController extends Controller
             'meta'       => ['column' => $column->name],
         ]);
 
+        broadcast(new BoardColumnUpdated($project, $column, 'created'))->toOthers();
+
         return back()->with('success', "Column \"{$data['name']}\" added.");
     }
 
@@ -53,6 +56,8 @@ class BoardColumnController extends Controller
             ]);
         }
 
+        broadcast(new BoardColumnUpdated($column->project, $column->refresh(), 'updated'))->toOthers();
+
         return back();
     }
 
@@ -64,6 +69,7 @@ class BoardColumnController extends Controller
 
         $name      = $column->name;
         $projectId = $column->project_id;
+        $project   = $column->project;
         $column->delete();
 
         AuditLog::create([
@@ -72,6 +78,10 @@ class BoardColumnController extends Controller
             'action'     => 'column.deleted',
             'meta'       => ['column' => $name],
         ]);
+
+        // The column instance still carries its attributes after delete(), so
+        // listeners can read the id to splice it out of the board.
+        broadcast(new BoardColumnUpdated($project, $column, 'deleted'))->toOthers();
 
         return back()->with('success', "Column \"{$name}\" removed.");
     }

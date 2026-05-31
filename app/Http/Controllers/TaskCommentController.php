@@ -63,12 +63,8 @@ class TaskCommentController extends Controller
 
     private function authorizeTaskAccess(Task $task): void
     {
-        $user    = auth()->user();
-        $project = $task->project;
-        abort_unless(
-            $project->owner_id === $user->id ||
-            $project->members()->where('users.id', $user->id)->exists(),
-            403
-        );
+        // Honors task-level grants too (Task::isAccessibleBy), so a granted
+        // non-member can comment on exactly the task they were given.
+        abort_unless($task->isAccessibleBy(auth()->user()), 403);
     }
 }

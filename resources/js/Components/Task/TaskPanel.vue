@@ -463,6 +463,43 @@
         </template>
       </Teleport>
 
+      <!-- Access requests -->
+      <div v-if="accessRequests.length" class="panel-section">
+        <div class="section-head">
+          <div class="head-left">
+            <span class="panel-section-title">Access requests</span>
+            <span class="count-mono">{{ accessRequests.length }}</span>
+          </div>
+        </div>
+
+        <div class="access-req-list">
+          <div
+            v-for="req in accessRequests"
+            :key="req.id"
+            :class="['access-req', resolvingAccess[req.id] ? 'is-' + resolvingAccess[req.id] : '']"
+          >
+            <Avatar :name="req.user?.name" size="md" />
+            <div class="access-req-body">
+              <div class="access-req-top">
+                <span class="access-req-name">{{ req.user?.name }}</span>
+                <span class="access-req-time">{{ req.requested_at }}</span>
+              </div>
+              <div class="access-req-sub">wants access to this task</div>
+              <div v-if="req.message" class="access-req-msg">{{ req.message }}</div>
+
+              <div v-if="resolvingAccess[req.id]" :class="['access-req-resolved', resolvingAccess[req.id]]">
+                <template v-if="resolvingAccess[req.id] === 'approved'"><CheckIcon /> Access granted</template>
+                <template v-else><CloseIcon /> Request declined</template>
+              </div>
+              <div v-else-if="canManageAccess" class="access-req-actions">
+                <button type="button" class="btn primary sm" @click="resolveAccess(req, true)"><CheckIcon /> Approve</button>
+                <button type="button" class="btn secondary sm" @click="resolveAccess(req, false)"><CloseIcon /> Decline</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Tabs: Comments / Activity -->
       <div class="panel-section">
         <div class="minitabs">
@@ -847,6 +884,8 @@
 <script setup>
 import { ref, computed, reactive, watch, nextTick } from 'vue'
 import { usePage } from '@inertiajs/vue3'
+import axios from 'axios'
+import { useToast } from '@/composables/useToast'
 import Avatar from '@/Components/UI/Avatar.vue'
 import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
 import DropdownMenu from '@/Components/UI/DropdownMenu.vue'
@@ -1041,6 +1080,52 @@ watch(() => [
   props.task?.audit_logs?.length,
   props.task?.completed_by,
 ], () => loadParticipants())
+
+// Access requests — pending requests from people who want into this task,
+// plus whether the current user (owner/admin) may approve or decline them.
+const { toast } = useToast()
+const accessRequests   = ref([])
+const canManageAccess  = ref(false)
+const resolvingAccess  = reactive({}) // { [id]: 'approved' | 'declined' }
+
+async function loadAccessRequests() {
+  if (!props.task?.id) { accessRequests.value = []; canManageAccess.value = false; return }
+  try {
+    const res = await fetch(route('tasks.access-requests.index', props.task.id), {
+      headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin',
+    })
+    if (!res.ok) { accessRequests.value = []; canManageAccess.value = false; return }
+    const data = await res.json()
+    accessRequests.value  = data.requests ?? []
+    canManageAccess.value = !!data.can_manage
+  } catch {
+    accessRequests.value = []
+    canManageAccess.value = false
+  }
+}
+loadAccessRequests()
+watch(() => props.task?.id, loadAccessRequests)
+
+async function resolveAccess(req, approved) {
+  if (!canManageAccess.value || resolvingAccess[req.id]) return
+  resolvingAccess[req.id] = approved ? 'approved' : 'declined'
+  const name = req.user?.name || 'them'
+  try {
+    const action = approved ? 'tasks.access-requests.approve' : 'tasks.access-requests.decline'
+    await axios.post(route(action, [props.task.id, req.id]))
+    // Brief resolved state reads before we drop the row.
+    setTimeout(() => {
+      accessRequests.value = accessRequests.value.filter(r => r.id !== req.id)
+      delete resolvingAccess[req.id]
+    }, 280)
+    toast(approved ? `Granted ${name} access to this task` : `Declined ${name}'s access request`)
+    if (approved) loadParticipants()
+  } catch (e) {
+    delete resolvingAccess[req.id]
+    toast(e.response?.data?.message || 'Could not update request')
+  }
+}
 
 // Subtask local state (attachments + comments — stored in-memory, not persisted)
 const subtaskLocalData = reactive({})
@@ -1760,4 +1845,43 @@ input[type="date"].input { padding: 0 8px; height: 28px; font-size: 13px; }
   color: var(--status-done);
   border-color: color-mix(in oklab, var(--status-done) 30%, var(--border));
 }
+/* Granted task-level access (no project membership) — ties to the lock color. */
+.role-chip.role-guest {
+  background: color-mix(in oklab, var(--status-blocked) 12%, var(--bg-panel));
+  color: var(--status-blocked);
+  border-color: color-mix(in oklab, var(--status-blocked) 30%, var(--border));
+}
+
+/* ===== Access requests ===== */
+.access-req-list { display: flex; flex-direction: column; gap: 8px; }
+.access-req {
+  display: flex; gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md, 8px);
+  background: var(--bg-panel);
+  transition: opacity 200ms ease, background 200ms ease;
+}
+.access-req.is-approved { background: color-mix(in oklab, var(--status-done) 6%, var(--bg-panel)); }
+.access-req.is-declined { opacity: 0.6; }
+.access-req-body { flex: 1; min-width: 0; }
+.access-req-top { display: flex; align-items: baseline; gap: 8px; }
+.access-req-name { font-size: 13px; font-weight: 600; color: var(--fg); }
+.access-req-time { font-size: 11px; color: var(--fg-subtle); }
+.access-req-sub  { font-size: 12px; color: var(--fg-muted); margin-top: 1px; }
+.access-req-msg  {
+  font-size: 12px; line-height: 1.5; color: var(--fg);
+  margin-top: 6px; padding: 8px 10px;
+  background: var(--bg-sunken);
+  border-radius: var(--r-sm, 6px);
+}
+.access-req-actions { display: flex; gap: 8px; margin-top: 10px; }
+.access-req-actions :deep(svg) { width: 12px; height: 12px; }
+.access-req-resolved {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 500; margin-top: 10px;
+}
+.access-req-resolved :deep(svg) { width: 13px; height: 13px; }
+.access-req-resolved.approved { color: var(--status-done); }
+.access-req-resolved.declined { color: var(--fg-muted); }
 </style>

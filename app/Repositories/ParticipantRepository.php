@@ -105,4 +105,21 @@ class ParticipantRepository
             ->unique()
             ->values();
     }
+
+    /**
+     * Users granted task-level access via an approved access request. Surfacing
+     * them as participants is the only place an owner can see who holds a grant
+     * once the request has left the pending "Access requests" list.
+     *
+     * @return Collection<int, int>
+     */
+    public function grantedUserIds(Task $task): Collection
+    {
+        return DB::table('task_access_requests')
+            ->where('task_id', $task->id)
+            ->where('status', 'approved')
+            ->pluck('user_id')
+            ->unique()
+            ->values();
+    }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Events\InboxNotificationSent;
+use App\Events\TaskDeleted;
 use App\Events\TaskUpdated;
 use App\Models\AuditLog;
 use App\Models\BoardColumn;
@@ -75,6 +77,10 @@ class TaskService
             'meta'       => $meta,
         ]);
 
+        if ($assigneeIds !== null) {
+            $this->notifyNewlyAssigned($before['assignee_ids'] ?? [], $after['assignee_ids'] ?? [], $userId);
+        }
+
         $task->refresh()->load(['assignee', 'assignees']);
         broadcast(new TaskUpdated($task))->toOthers();
 
@@ -106,7 +112,31 @@ class TaskService
 
         $this->activityService->recordChanges($task, null, $before, $after, $actingUserId);
 
+        $this->notifyNewlyAssigned($before['assignee_ids'] ?? [], $after['assignee_ids'] ?? [], $actingUserId);
+
         return $task->refresh();
+    }
+
+    /**
+     * Ping the inbox of every user who was just added as an assignee (never the
+     * actor themselves — you don't get notified for assigning yourself). The
+     * inbox is derived on read, so the event is only a "refresh" trigger.
+     *
+     * @param  array<int>  $before
+     * @param  array<int>  $after
+     */
+    private function notifyNewlyAssigned(array $before, array $after, int $actorId): void
+    {
+        $added = array_diff(
+            array_map('intval', $after),
+            array_map('intval', $before),
+        );
+
+        foreach ($added as $userId) {
+            if ((int) $userId !== $actorId) {
+                broadcast(new InboxNotificationSent((int) $userId, 'assigned'))->toOthers();
+            }
+        }
     }
 
     public function createSubtask(Task $parent, string $title, ?string $priority, int $userId): Task
@@ -194,7 +224,12 @@ class TaskService
             'meta'       => ['key' => $task->key, 'title' => $task->title],
         ]);
 
+        $projectId = (int) $task->project_id;
+        $taskId    = (int) $task->id;
+
         $this->repository->delete($task);
+
+        broadcast(new TaskDeleted($projectId, $taskId))->toOthers();
     }
 
     private function resolveAuditAction(Task $task, array $data, ?array $assigneeIds = null, bool $isBacklogMove = false): string

@@ -23,7 +23,10 @@
               {{ n.verb }}
               <strong class="font-mono">{{ n.target }}</strong>
             </p>
-            <p v-if="n.excerpt" class="text-xs mt-0.5 truncate" style="color: var(--fg-muted)">{{ n.excerpt }}</p>
+            <p v-if="n.excerpt" class="text-xs mt-0.5 truncate flex items-center gap-1.5" style="color: var(--fg-muted)">
+              <LockIcon v-if="n.restricted" class="shrink-0" style="width: 11px; height: 11px; color: var(--fg-subtle)" />
+              <span class="truncate">{{ n.excerpt }}</span>
+            </p>
           </div>
 
           <div class="text-xs shrink-0" style="color: var(--fg-subtle)">{{ n.time }}</div>
@@ -52,7 +55,7 @@ import { ref } from 'vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import Avatar from '@/Components/UI/Avatar.vue'
 import GlobalTaskPanel from '@/Components/Task/GlobalTaskPanel.vue'
-import { InboxIcon } from '@/Components/UI/Icons.vue'
+import { InboxIcon, LockIcon } from '@/Components/UI/Icons.vue'
 
 const props = defineProps({
   notifications: { type: Array, default: () => [] },

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\ProjectMembersChanged;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -79,6 +80,8 @@ class MembersController extends Controller
             'meta'       => ['email' => $invitee->email, 'role' => $data['role']],
         ]);
 
+        broadcast(new ProjectMembersChanged($project->id, 'member_invited', $invitee->id))->toOthers();
+
         return back()->with('success', "{$invitee->name} has been added to the project.");
     }
 
@@ -91,6 +94,8 @@ class MembersController extends Controller
         ]);
 
         $project->members()->updateExistingPivot($member->id, ['role' => $data['role']]);
+
+        broadcast(new ProjectMembersChanged($project->id, 'role_updated', $member->id))->toOthers();
 
         return back()->with('success', 'Role updated.');
     }
@@ -107,6 +112,8 @@ class MembersController extends Controller
             'action'     => 'member.removed',
             'meta'       => ['email' => $member->email],
         ]);
+
+        broadcast(new ProjectMembersChanged($project->id, 'member_removed', $member->id))->toOthers();
 
         return back()->with('success', "{$member->name} has been removed from the project.");
     }

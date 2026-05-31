@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\SprintUpdated;
 use App\Models\AuditLog;
 use App\Models\Project;
 use App\Models\Sprint;
@@ -30,6 +31,8 @@ class SprintController extends Controller
             'meta'       => ['sprint' => $sprint->name],
         ]);
 
+        broadcast(new SprintUpdated($sprint, 'created'))->toOthers();
+
         return back()->with('success', "Sprint \"{$sprint->name}\" created.");
     }
 
@@ -44,6 +47,8 @@ class SprintController extends Controller
             'meta'       => ['sprint' => $sprint->name],
         ]);
 
+        broadcast(new SprintUpdated($sprint, 'locked'))->toOthers();
+
         return back()->with('success', "{$sprint->name} locked. Tasks are now read-only.");
     }
 
@@ -57,6 +62,8 @@ class SprintController extends Controller
             'action'     => 'sprint.unlocked',
             'meta'       => ['sprint' => $sprint->name],
         ]);
+
+        broadcast(new SprintUpdated($sprint, 'unlocked'))->toOthers();
 
         return back()->with('success', "{$sprint->name} unlocked.");
     }
@@ -74,6 +81,8 @@ class SprintController extends Controller
             'meta'       => ['sprint' => $sprint->name],
         ]);
 
+        broadcast(new SprintUpdated($sprint, 'completed'))->toOthers();
+
         return back()->with('success', "{$sprint->name} completed.");
     }
 
@@ -89,6 +98,8 @@ class SprintController extends Controller
             'action'     => 'sprint.reopened',
             'meta'       => ['sprint' => $sprint->name],
         ]);
+
+        broadcast(new SprintUpdated($sprint, 'reopened'))->toOthers();
 
         return back()->with('success', "{$sprint->name} reopened.");
     }

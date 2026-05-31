@@ -32,6 +32,15 @@
     @attachmentUpload="uploadAttachment"
     @attachmentRemove="removeAttachment"
   />
+
+  <NoAccessPanel
+    v-else-if="noAccess"
+    :task="noAccess.task"
+    :project="noAccess.project"
+    :approvers="noAccess.approvers"
+    :pending-request="noAccess.pendingRequest"
+    @close="close"
+  />
 </template>
 
 <script setup>
@@ -39,6 +48,7 @@ import { ref, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
 import axios from 'axios'
 import TaskPanel from '@/Components/Task/TaskPanel.vue'
+import NoAccessPanel from '@/Components/Task/NoAccessPanel.vue'
 import { useToast } from '@/composables/useToast'
 
 const props = defineProps({
@@ -54,15 +64,17 @@ const allProjects = ref([])
 const sprints     = ref([])
 const project     = ref(null)
 const locked      = ref(false)
+const noAccess    = ref(null)
 
 let loadToken = 0
 
 async function load(id) {
-  if (!id) { task.value = null; return }
+  if (!id) { task.value = null; noAccess.value = null; return }
   const myToken = ++loadToken
   try {
     const { data } = await axios.get(route('tasks.details', id))
     if (myToken !== loadToken) return // a newer open superseded this one
+    noAccess.value    = null
     task.value        = data.task
     columns.value     = data.columns
     allUsers.value    = data.allUsers
@@ -71,8 +83,14 @@ async function load(id) {
     project.value     = data.project
     locked.value      = data.locked
   } catch (e) {
-    if (myToken === loadToken) {
+    if (myToken !== loadToken) return
+    // A 403 with hasAccess:false is expected — show the locked preview.
+    if (e.response?.status === 403 && e.response.data?.hasAccess === false) {
       task.value = null
+      noAccess.value = e.response.data
+    } else {
+      task.value = null
+      noAccess.value = null
       emit('close')
     }
   }
@@ -87,6 +105,7 @@ watch(() => props.taskId, (id) => load(id), { immediate: true })
 function close() {
   loadToken++
   task.value = null
+  noAccess.value = null
   emit('close')
 }
 

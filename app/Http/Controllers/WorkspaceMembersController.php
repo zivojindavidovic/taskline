@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\InvitationProjectAccessUpdated;
 use App\Events\MemberProjectAccessUpdated;
+use App\Events\WorkspaceMembersChanged;
 use App\Http\Requests\InviteMemberRequest;
 use App\Models\User;
 use App\Models\Workspace;
@@ -118,6 +119,8 @@ class WorkspaceMembersController extends Controller
             return back()->withErrors($e->errors());
         }
 
+        broadcast(new WorkspaceMembersChanged($workspace->id, 'member_invited'))->toOthers();
+
         return back()->with('success', "Invitation sent to {$data['email']}.");
     }
 
@@ -189,6 +192,8 @@ class WorkspaceMembersController extends Controller
             ];
         });
 
+        broadcast(new WorkspaceMembersChanged($workspace->id, 'member_added'))->toOthers();
+
         return back()
             ->with('success', "{$created['name']} added.")
             ->with('createdCred', $created);
@@ -203,6 +208,8 @@ class WorkspaceMembersController extends Controller
 
         $this->invitations->revoke($workspace, $invitation, $user->id);
 
+        broadcast(new WorkspaceMembersChanged($workspace->id, 'invitation_revoked'))->toOthers();
+
         return back()->with('success', 'Invitation revoked.');
     }
 
@@ -216,6 +223,8 @@ class WorkspaceMembersController extends Controller
         $data = $request->validate(['role' => 'required|in:admin,member,viewer']);
 
         $workspace->users()->updateExistingPivot($member, ['role' => $data['role']]);
+
+        broadcast(new WorkspaceMembersChanged($workspace->id, 'role_updated', $member))->toOthers();
 
         return back()->with('success', 'Role updated.');
     }
@@ -240,6 +249,8 @@ class WorkspaceMembersController extends Controller
         User::where('id', $member)
             ->where('current_workspace_id', $workspace->id)
             ->update(['current_workspace_id' => null]);
+
+        broadcast(new WorkspaceMembersChanged($workspace->id, 'member_removed', $member))->toOthers();
 
         return back()->with('success', 'Member removed from workspace.');
     }

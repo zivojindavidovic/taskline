@@ -168,6 +168,18 @@ onMounted(() => {
     .listen('MemberProjectAccessUpdated', () => {
       router.reload({ preserveScroll: true, preserveState: true })
     })
+    // A new mention or assignment landed in my inbox — refresh the sidebar
+    // badge (inbox_count is a shared prop) and, if I'm on the Inbox page, its
+    // list at the same time.
+    .listen('InboxNotificationSent', () => {
+      router.reload({ preserveScroll: true, preserveState: true })
+    })
+    // A manager just approved (or revoked) my task-level access request — the
+    // locked "Request access" panel and the inbox lock icon both depend on
+    // server state, so re-pull it so the task unlocks (or re-locks) live.
+    .listen('TaskAccessRequestUpdated', () => {
+      router.reload({ preserveScroll: true, preserveState: true })
+    })
 })
 
 onBeforeUnmount(() => {

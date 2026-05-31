@@ -53,6 +53,9 @@ class ParticipantService
         foreach ($this->repository->replyAuthorIds($task) as $id) {
             $add((int) $id, 'commenter');
         }
+        foreach ($this->repository->grantedUserIds($task) as $id) {
+            $add((int) $id, 'guest');
+        }
 
         if (empty($rolesByUser)) {
             return collect();
@@ -77,7 +80,7 @@ class ParticipantService
      */
     private function sortRoles(array $roles): array
     {
-        $order = ['reporter', 'assignee', 'past_assignee', 'completer', 'editor', 'commenter'];
+        $order = ['reporter', 'assignee', 'past_assignee', 'completer', 'editor', 'commenter', 'guest'];
         usort($roles, fn ($a, $b) => array_search($a, $order, true) <=> array_search($b, $order, true));
         return $roles;
     }
