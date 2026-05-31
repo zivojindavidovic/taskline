@@ -910,7 +910,7 @@ const props = defineProps({
 const emit = defineEmits([
   'close', 'update', 'comment', 'reply',
   'complete', 'uncomplete', 'delete',
-  'subtask', 'subtaskToggle', 'subtaskRemove', 'subtaskUpdate',
+  'subtask', 'subtaskToggle', 'subtaskRemove', 'subtaskUpdate', 'subtaskComment',
   'attachmentUpload', 'attachmentRemove',
 ])
 
@@ -1138,11 +1138,7 @@ const openSubtaskAttachments = computed(() => {
   const local = subtaskLocalData[openSubtask.value.id]?.attachments ?? []
   return [...(openSubtask.value.attachments ?? []), ...local]
 })
-const openSubtaskComments = computed(() => {
-  if (!openSubtask.value) return []
-  const local = subtaskLocalData[openSubtask.value.id]?.comments ?? []
-  return [...(openSubtask.value.comments ?? []), ...local]
-})
+const openSubtaskComments = computed(() => openSubtask.value?.comments ?? [])
 const subtaskNewComment = ref('')
 function onSubtaskAttachmentUpload(file) {
   if (!openSubtask.value) return
@@ -1159,9 +1155,10 @@ function onSubtaskAttachmentRemove(id) {
 function submitSubtaskComment() {
   const body = subtaskNewComment.value.trim()
   if (!body || !openSubtask.value) return
-  getSubtaskData(openSubtask.value.id).comments.push({
-    id: Date.now(), author: currentUser.value?.name ?? 'Me', body, time: 'just now',
-  })
+  // A subtask is a Task, so its comments persist through the same
+  // tasks.comments.store route (which broadcasts CommentAdded). The parent
+  // handles the POST + refetch so the new comment lands on the subtask.
+  emit('subtaskComment', openSubtask.value.id, body)
   subtaskNewComment.value = ''
 }
 

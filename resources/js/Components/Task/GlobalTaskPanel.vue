@@ -29,6 +29,7 @@
     @subtaskToggle="toggleSubtask"
     @subtaskRemove="removeSubtask"
     @subtaskUpdate="handleSubtaskUpdate"
+    @subtaskComment="postSubtaskComment"
     @attachmentUpload="uploadAttachment"
     @attachmentRemove="removeAttachment"
   />
@@ -137,6 +138,9 @@ function postComment(body) {
 }
 function postReply(commentId, body) {
   router.post(route('tasks.comments.reply', [task.value.id, commentId]), { body }, opts(refetch))
+}
+function postSubtaskComment(subtaskId, body) {
+  router.post(route('tasks.comments.store', subtaskId), { body }, opts(refetch))
 }
 function addSubtask(data) {
   router.post(route('tasks.subtasks.store', task.value.id), data, opts(refetch))

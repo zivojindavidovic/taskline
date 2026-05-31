@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\TaskCreated;
+use App\Events\TaskUpdated;
 use App\Models\Project;
 use App\Models\Sprint;
 use App\Models\Task;
@@ -181,6 +182,11 @@ class TaskController extends Controller
                 'assignee:id,name,email,avatar_color',
                 'assignees:id,name,email,avatar_color',
                 'boardColumn:id,name,color',
+                'comments' => fn ($q2) => $q2->oldest(),
+                'comments.user:id,name,email,avatar_color',
+                'comments.mentionedUsers:id,name,email,avatar_color',
+                'comments.replies' => fn ($q2) => $q2->oldest(),
+                'comments.replies.user:id,name,email,avatar_color',
             ]),
             'attachments' => fn ($q) => $q->latest(),
             'attachments.uploader:id,name,avatar_color',
@@ -251,6 +257,8 @@ class TaskController extends Controller
 
         $this->activityService->recordStatusChange($task, $wasCompleted, true, auth()->id());
 
+        $this->broadcastCompletionChange($task);
+
         return back()->with('success', 'Task marked as completed.');
     }
 
@@ -272,7 +280,40 @@ class TaskController extends Controller
 
         $this->activityService->recordStatusChange($task, $wasCompleted, false, auth()->id());
 
+        $this->broadcastCompletionChange($task);
+
         return back();
+    }
+
+    /**
+     * Push a live update after a completion toggle. A subtask isn't its own
+     * board card, so broadcasting it would never reach a listener — instead we
+     * broadcast the parent (with its subtask list reloaded), exactly like
+     * TaskService::createSubtask/updateSubtask do, so the parent card progress
+     * and the open panel's checkbox both update for other viewers. A top-level
+     * task broadcasts itself so its card flips to the completed state.
+     */
+    private function broadcastCompletionChange(Task $task): void
+    {
+        if ($task->parent_task_id) {
+            $parent = $task->parent()->first();
+            if (! $parent) {
+                return;
+            }
+            $parent->load([
+                'assignee',
+                'assignees',
+                'subtasks.assignee',
+                'subtasks.assignees',
+                'subtasks.boardColumn',
+            ]);
+            broadcast(new TaskUpdated($parent))->toOthers();
+
+            return;
+        }
+
+        $task->load(['assignee', 'assignees']);
+        broadcast(new TaskUpdated($task))->toOthers();
     }
 
     public function storeSubtask(Request $request, Task $task): RedirectResponse

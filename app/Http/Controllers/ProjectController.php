@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MemberProjectAccessUpdated;
 use App\Events\ProjectCreated;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\FilterService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -17,12 +19,6 @@ class ProjectController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            'name'  => 'required|string|max:100',
-            'key'   => 'required|string|max:6|regex:/^[A-Z0-9]+$/',
-            'color' => 'required|string|max:7',
-        ]);
-
         $user = auth()->user();
 
         abort_unless(
@@ -31,20 +27,62 @@ class ProjectController extends Controller
             'You must create a workspace before adding projects.'
         );
 
+        $workspaceId = $user->current_workspace_id;
+
+        // Project name and key must be unique within the workspace — two
+        // projects called "Mobile App" (or sharing the "MOB" key) in the same
+        // workspace are ambiguous in the sidebar, task keys, and search.
+        $data = $request->validate([
+            'name'  => [
+                'required', 'string', 'max:100',
+                Rule::unique('projects', 'name')->where(fn ($q) => $q->where('workspace_id', $workspaceId)),
+            ],
+            'key'   => [
+                'required', 'string', 'max:6', 'regex:/^[A-Z0-9]+$/',
+                Rule::unique('projects', 'key')->where(fn ($q) => $q->where('workspace_id', $workspaceId)),
+            ],
+            'color' => 'required|string|max:7',
+        ], [
+            'name.unique' => 'A project with this name already exists in this workspace.',
+            'key.unique'  => 'A project with this key already exists in this workspace.',
+        ]);
+
         $project = Project::create([
             ...$data,
             'owner_id'     => $user->id,
             'workspace_id' => $user->current_workspace_id,
         ]);
 
-        // The workspace owner always gets immediate access (as admin) to any
-        // project created by another member — so projects created by non-owner
-        // members are never invisible to the workspace owner.
-        $workspaceOwnerId = $user->currentWorkspace?->owner_id;
+        // Every workspace member except viewers gets immediate access to a new
+        // project — viewers are read-only and must be granted access explicitly.
+        // The creator is the owner; the workspace owner is an admin; everyone
+        // else mirrors their workspace role (admins → admin, members → member).
+        $workspace        = $user->currentWorkspace;
+        $workspaceOwnerId = $workspace?->owner_id;
+
+        $grantees = $workspace ? $workspace->users()->get() : collect();
+
+        $memberRows = [];
+        foreach ($grantees as $member) {
+            $wsRole = $member->pivot->role ?? 'member';
+            if ($wsRole === 'viewer') {
+                continue; // viewers are read-only; no automatic project access
+            }
+            if ((int) $member->id === (int) $user->id) {
+                continue; // creator already attached below as owner
+            }
+            $isAdmin = $member->id === $workspaceOwnerId || $wsRole === 'admin';
+            $memberRows[$member->id] = ['role' => $isAdmin ? 'admin' : 'member'];
+        }
+
+        // Always keep the workspace owner reachable, even if the pivot query
+        // above missed them (e.g. owner stored only on workspaces.owner_id).
         if ($workspaceOwnerId && $workspaceOwnerId !== $user->id) {
-            $project->members()->syncWithoutDetaching([
-                $workspaceOwnerId => ['role' => 'admin'],
-            ]);
+            $memberRows[$workspaceOwnerId] = ['role' => 'admin'];
+        }
+
+        if ($memberRows) {
+            $project->members()->syncWithoutDetaching($memberRows);
         }
 
         // Default columns
@@ -73,6 +111,28 @@ class ProjectController extends Controller
         ]);
 
         broadcast(new ProjectCreated($project))->toOthers();
+
+        // Tell each newly-granted member their project access changed so their
+        // sidebar picks up the new project live (AppLayout listens for this on
+        // their user channel and reloads the shared `projects` prop). Reusing
+        // MemberProjectAccessUpdated avoids a second listener on the workspace
+        // channel, which AppLayout doesn't own.
+        foreach (array_keys($memberRows) as $memberId) {
+            $projectIds = Project::query()
+                ->where('workspace_id', $workspaceId)
+                ->where(function ($q) use ($memberId) {
+                    $q->where('owner_id', $memberId)
+                      ->orWhereHas('members', fn ($q2) => $q2->where('users.id', $memberId));
+                })
+                ->pluck('id')
+                ->all();
+
+            broadcast(new MemberProjectAccessUpdated(
+                (int) $workspaceId,
+                (int) $memberId,
+                $projectIds,
+            ))->toOthers();
+        }
 
         return redirect()->route('projects.show', $project)
             ->with('success', "Project \"{$project->name}\" created.");
@@ -156,6 +216,11 @@ class ProjectController extends Controller
                     'assignee:id,name,email,avatar_color',
                     'assignees:id,name,email,avatar_color',
                     'boardColumn:id,name,color',
+                    'comments' => fn ($q2) => $q2->oldest(),
+                    'comments.user:id,name,email,avatar_color',
+                    'comments.mentionedUsers:id,name,email,avatar_color',
+                    'comments.replies' => fn ($q2) => $q2->oldest(),
+                    'comments.replies.user:id,name,email,avatar_color',
                 ]),
                 'attachments' => fn ($q) => $q->latest(),
                 'attachments.uploader:id,name,avatar_color',

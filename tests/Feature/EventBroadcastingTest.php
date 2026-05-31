@@ -4,13 +4,17 @@ namespace Tests\Feature;
 
 use App\Events\AuditLogRecorded;
 use App\Events\BoardColumnUpdated;
+use App\Events\CommentAdded;
 use App\Events\InboxNotificationSent;
+use App\Events\MemberProjectAccessUpdated;
 use App\Events\ProjectCreated;
 use App\Events\ProjectMembersChanged;
 use App\Events\SprintUpdated;
 use App\Events\TaskAccessRequestUpdated;
 use App\Events\TaskDeleted;
+use App\Events\TaskUpdated;
 use App\Events\WorkspaceMembersChanged;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use App\Models\AuditLog;
 use App\Models\BoardColumn;
 use App\Models\Project;
@@ -104,6 +108,22 @@ class EventBroadcastingTest extends TestCase
             'project_id'      => $this->project->id,
             'sprint_id'       => $this->sprint->id,
             'board_column_id' => $this->column->id,
+            'created_by'      => $this->owner->id,
+            'priority'        => 'med',
+        ], $attrs));
+    }
+
+    private function makeSubtask(Task $parent, array $attrs = []): Task
+    {
+        static $counter = 0;
+        $counter++;
+
+        return Task::create(array_merge([
+            'key'             => "{$parent->key}-S{$counter}",
+            'title'           => "Subtask {$counter}",
+            'project_id'      => $parent->project_id,
+            'parent_task_id'  => $parent->id,
+            'board_column_id' => $parent->board_column_id,
             'created_by'      => $this->owner->id,
             'priority'        => 'med',
         ], $attrs));
@@ -508,5 +528,221 @@ class EventBroadcastingTest extends TestCase
         $channels = (new InboxNotificationSent($this->alice->id, 'mention'))->broadcastOn();
 
         $this->assertSame('private-App.Models.User.' . $this->alice->id, $channels[0]->name);
+    }
+
+    // ──────────────── Task & subtask completion (issues 1 & 2) ────────────────
+
+    public function test_completing_task_dispatches_task_updated(): void
+    {
+        $task = $this->makeTask();
+
+        Event::fake([TaskUpdated::class]);
+
+        $this->actingAs($this->owner)
+            ->post("/tasks/{$task->id}/complete")
+            ->assertRedirect();
+
+        Event::assertDispatched(TaskUpdated::class, fn (TaskUpdated $e) =>
+            $e->task->id === $task->id && $e->task->completed === true
+        );
+    }
+
+    public function test_uncompleting_task_dispatches_task_updated(): void
+    {
+        $task = $this->makeTask([
+            'completed'    => true,
+            'completed_at' => now(),
+            'completed_by' => $this->owner->id,
+        ]);
+
+        Event::fake([TaskUpdated::class]);
+
+        $this->actingAs($this->owner)
+            ->post("/tasks/{$task->id}/uncomplete")
+            ->assertRedirect();
+
+        Event::assertDispatched(TaskUpdated::class, fn (TaskUpdated $e) =>
+            $e->task->id === $task->id && $e->task->completed === false
+        );
+    }
+
+    public function test_completing_subtask_broadcasts_the_parent_not_the_subtask(): void
+    {
+        $parent  = $this->makeTask();
+        $subtask = $this->makeSubtask($parent);
+
+        Event::fake([TaskUpdated::class]);
+
+        $this->actingAs($this->owner)
+            ->post("/tasks/{$subtask->id}/complete")
+            ->assertRedirect();
+
+        // A subtask isn't its own board card; the parent is broadcast so the
+        // parent card progress + open panel checkbox update for other viewers.
+        Event::assertDispatched(TaskUpdated::class, fn (TaskUpdated $e) =>
+            $e->task->id === $parent->id
+        );
+        Event::assertNotDispatched(TaskUpdated::class, fn (TaskUpdated $e) =>
+            $e->task->id === $subtask->id
+        );
+    }
+
+    public function test_uncompleting_subtask_broadcasts_the_parent(): void
+    {
+        $parent  = $this->makeTask();
+        $subtask = $this->makeSubtask($parent, [
+            'completed'    => true,
+            'completed_at' => now(),
+            'completed_by' => $this->owner->id,
+        ]);
+
+        Event::fake([TaskUpdated::class]);
+
+        $this->actingAs($this->owner)
+            ->post("/tasks/{$subtask->id}/uncomplete")
+            ->assertRedirect();
+
+        Event::assertDispatched(TaskUpdated::class, fn (TaskUpdated $e) =>
+            $e->task->id === $parent->id
+        );
+    }
+
+    // ──────────────── Subtask comments (issue 3) ────────────────
+
+    public function test_commenting_on_subtask_dispatches_comment_added(): void
+    {
+        $parent  = $this->makeTask();
+        $subtask = $this->makeSubtask($parent);
+
+        Event::fake([CommentAdded::class]);
+
+        $this->actingAs($this->owner)
+            ->post("/tasks/{$subtask->id}/comments", ['body' => 'Note on the subtask'])
+            ->assertRedirect();
+
+        Event::assertDispatched(CommentAdded::class, fn (CommentAdded $e) =>
+            $e->task->id === $subtask->id && $e->comment->body === 'Note on the subtask'
+        );
+
+        // It also persists (the old frontend kept it in-memory only).
+        $this->assertDatabaseHas('task_comments', [
+            'task_id' => $subtask->id,
+            'body'    => 'Note on the subtask',
+        ]);
+    }
+
+    // ──────────────── Immediate (non-queued) broadcasting (issue 4) ────────────────
+
+    public function test_realtime_events_broadcast_immediately_not_queued(): void
+    {
+        // QUEUE_CONNECTION=database means an event implementing only
+        // ShouldBroadcast is enqueued and never reaches websockets without a
+        // running worker. Every live-listened event must broadcast NOW.
+        foreach ([
+            BoardColumnUpdated::class,
+            TaskDeleted::class,
+            SprintUpdated::class,
+            TaskUpdated::class,
+            CommentAdded::class,
+            ProjectCreated::class,
+            MemberProjectAccessUpdated::class,
+        ] as $event) {
+            $instance = (new \ReflectionClass($event))->newInstanceWithoutConstructor();
+            $this->assertInstanceOf(
+                ShouldBroadcastNow::class,
+                $instance,
+                "{$event} must implement ShouldBroadcastNow to broadcast without a queue worker."
+            );
+        }
+    }
+
+    // ──────────────── Duplicate project name/key (issue 5) ────────────────
+
+    public function test_creating_project_with_duplicate_name_is_rejected(): void
+    {
+        $this->actingAs($this->owner)
+            ->post('/projects', ['name' => 'Proj', 'key' => 'NEWK', 'color' => '#dc2626'])
+            ->assertSessionHasErrors('name');
+
+        $this->assertSame(
+            1,
+            Project::where('workspace_id', $this->workspace->id)->where('name', 'Proj')->count()
+        );
+    }
+
+    public function test_creating_project_with_duplicate_key_is_rejected(): void
+    {
+        $this->actingAs($this->owner)
+            ->post('/projects', ['name' => 'Brand New Name', 'key' => 'PRJ', 'color' => '#dc2626'])
+            ->assertSessionHasErrors('key');
+    }
+
+    public function test_duplicate_project_name_is_allowed_in_a_different_workspace(): void
+    {
+        $other = Workspace::create([
+            'name'     => 'Other WS',
+            'owner_id' => $this->owner->id,
+            'color'    => '#16a34a',
+        ]);
+        $other->users()->attach($this->owner->id, ['role' => 'owner']);
+        $this->owner->update(['current_workspace_id' => $other->id]);
+
+        // "Proj" already exists in the first workspace — allowed here.
+        $this->actingAs($this->owner)
+            ->post('/projects', ['name' => 'Proj', 'key' => 'PRJ', 'color' => '#dc2626'])
+            ->assertRedirect();
+
+        $this->assertTrue(
+            Project::where('workspace_id', $other->id)->where('name', 'Proj')->exists()
+        );
+    }
+
+    // ──────────────── New-project access for non-viewers (issue 6) ────────────────
+
+    public function test_creating_project_grants_access_to_non_viewer_members_only(): void
+    {
+        $viewer = User::factory()->create(['name' => 'Viewer']);
+        $this->workspace->users()->attach($viewer->id, ['role' => 'viewer']);
+
+        $this->actingAs($this->owner)
+            ->post('/projects', ['name' => 'Fresh Project', 'key' => 'FRESH', 'color' => '#dc2626'])
+            ->assertRedirect();
+
+        $project = Project::where('workspace_id', $this->workspace->id)->where('key', 'FRESH')->firstOrFail();
+
+        // The creator owns the project (access is via owner_id, not the pivot).
+        $this->assertSame($this->owner->id, $project->owner_id);
+        // Non-viewer members get pivot access...
+        $this->assertTrue($project->members()->where('users.id', $this->alice->id)->exists());
+        $this->assertTrue($project->members()->where('users.id', $this->bob->id)->exists());
+        // ...but viewers do NOT.
+        $this->assertFalse($project->members()->where('users.id', $viewer->id)->exists());
+    }
+
+    public function test_creating_project_notifies_non_viewer_members_on_their_user_channel(): void
+    {
+        $viewer = User::factory()->create(['name' => 'Viewer']);
+        $this->workspace->users()->attach($viewer->id, ['role' => 'viewer']);
+
+        Event::fake([MemberProjectAccessUpdated::class]);
+
+        $this->actingAs($this->owner)
+            ->post('/projects', ['name' => 'Notify Project', 'key' => 'NOTIF', 'color' => '#dc2626'])
+            ->assertRedirect();
+
+        Event::assertDispatched(MemberProjectAccessUpdated::class, fn (MemberProjectAccessUpdated $e) =>
+            $e->memberId === $this->alice->id
+        );
+        Event::assertDispatched(MemberProjectAccessUpdated::class, fn (MemberProjectAccessUpdated $e) =>
+            $e->memberId === $this->bob->id
+        );
+        // The creator already navigates to the project — no self-notification.
+        Event::assertNotDispatched(MemberProjectAccessUpdated::class, fn (MemberProjectAccessUpdated $e) =>
+            $e->memberId === $this->owner->id
+        );
+        // Viewers aren't granted access, so they aren't notified.
+        Event::assertNotDispatched(MemberProjectAccessUpdated::class, fn (MemberProjectAccessUpdated $e) =>
+            $e->memberId === $viewer->id
+        );
     }
 }

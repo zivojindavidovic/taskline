@@ -319,6 +319,7 @@
       @subtaskToggle="toggleSubtask"
       @subtaskRemove="removeSubtask"
       @subtaskUpdate="handleSubtaskUpdate"
+      @subtaskComment="postSubtaskComment"
       @attachmentUpload="uploadAttachment"
       @attachmentRemove="removeAttachment"
     />
@@ -560,19 +561,24 @@ onMounted(() => {
       // Comments tab and the derived Participants list update live.
       // TaskPanel watches task.comments.length and reloads participants
       // from the server, so we don't need to touch participants here.
-      const task = localTasks.value.find(t => t.id === task_id)
-      if (task) {
-        task.comments = task.comments ?? []
-        if (!task.comments.find(c => c.id === comment.id)) {
-          task.comments.push(comment)
+      const appendComment = (owner) => {
+        owner.comments = owner.comments ?? []
+        if (!owner.comments.find(c => c.id === comment.id)) {
+          owner.comments.push(comment)
         }
       }
-      if (activeTask.value?.id === task_id) {
-        activeTask.value.comments = activeTask.value.comments ?? []
-        if (!activeTask.value.comments.find(c => c.id === comment.id)) {
-          activeTask.value.comments.push(comment)
-        }
+      // task_id may be a top-level task OR a subtask. Subtasks aren't in
+      // localTasks (top-level only), so also look inside each task's subtasks.
+      const findOwner = (task) => {
+        if (!task) return null
+        if (task.id === task_id) return task
+        return (task.subtasks ?? []).find(s => s.id === task_id) ?? null
       }
+      const localOwner = findOwner(localTasks.value.find(t => t.id === task_id))
+        ?? localTasks.value.map(findOwner).find(Boolean)
+      if (localOwner) appendComment(localOwner)
+      const activeOwner = findOwner(activeTask.value)
+      if (activeOwner) appendComment(activeOwner)
     })
     .listen('ReplyAdded', ({ task_id, comment_id, reply }) => {
       const appendReply = (task) => {
@@ -845,6 +851,10 @@ function deleteTask() {
 
 function postComment(body) {
   router.post(route('tasks.comments.store', activeTask.value.id), { body }, { preserveScroll: true })
+}
+
+function postSubtaskComment(subtaskId, body) {
+  router.post(route('tasks.comments.store', subtaskId), { body }, { preserveScroll: true })
 }
 
 function postReply(commentId, body) {
