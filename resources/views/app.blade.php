@@ -6,6 +6,14 @@
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
+        <!-- Favicons / brand (files live in public/brand) -->
+        <link rel="icon" type="image/svg+xml" href="/brand/favicon.svg">
+        <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
+        <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+        <link rel="manifest" href="/brand/site.webmanifest">
+        <meta name="theme-color" content="#4F46E5">
+
         <!-- Apply theme before paint to avoid flash -->
         <script>
         (function () {

@@ -1,0 +1,22 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Taskline">
+  <defs>
+    <linearGradient id="tile" x1="64" y1="40" x2="448" y2="472" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6366F1"></stop>
+      <stop offset="1" stop-color="#4F46E5"></stop>
+    </linearGradient>
+    <linearGradient id="sheen" x1="256" y1="32" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.18"></stop>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"></stop>
+    </linearGradient>
+  </defs>
+
+  
+  <rect x="32" y="32" width="448" height="448" rx="116" fill="url(#tile)"></rect>
+  <rect x="32" y="32" width="448" height="448" rx="116" fill="url(#sheen)"></rect>
+
+  
+  
+  <rect x="146" y="166" width="220" height="58" rx="29" fill="#FFFFFF"></rect>
+  
+  <rect x="227" y="166" width="58" height="216" rx="29" fill="#FFFFFF"></rect>
+</svg>
