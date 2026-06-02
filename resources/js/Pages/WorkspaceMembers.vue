@@ -403,24 +403,16 @@ function updatePendingAccess(invite, projectIds) {
 </script>
 
 <style scoped>
+/* The page scroll is owned by .main-area (AppLayout). Keeping this a plain
+   block — rather than a second flex scroll container — avoids the nested
+   overflow conflict that stopped the Current members list from scrolling.
+   A normal block's bottom padding is honored across browsers, so no spacer
+   hack is needed. */
 .members-page {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px 32px 0;
+  padding: 24px 32px;
   max-width: 860px;
   margin: 0 auto;
   width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-/* In-flow spacer: Firefox ignores a scroll container's padding-bottom when
-   content overflows, so the last card touches the edge. A non-shrinking flex
-   item reserves the bottom gap reliably across browsers. */
-.members-page::after {
-  content: '';
-  display: block;
-  flex: 0 0 24px;
 }
 
 /* Page header */
