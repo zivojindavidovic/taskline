@@ -227,6 +227,7 @@ import DropdownMenu from '@/Components/UI/DropdownMenu.vue'
 import MenuItem from '@/Components/UI/MenuItem.vue'
 import ProjectAccessControl from '@/Components/UI/ProjectAccessControl.vue'
 import { UsersIcon, InboxIcon, CheckIcon, LockIcon } from '@/Components/UI/Icons.vue'
+import { copyText } from '@/utils/clipboard'
 
 const ROLE_STYLES = {
   owner:  { bg: 'color-mix(in oklab, var(--accent) 12%, var(--bg-panel))', fg: 'var(--accent)' },
@@ -353,12 +354,10 @@ watch(() => page.props.flash?.createdCred, (cred) => {
   if (cred) { createdCred.value = cred; copied.value = false }
 })
 
-function copyCred() {
+async function copyCred() {
   if (!createdCred.value) return
-  try {
-    navigator.clipboard?.writeText(`${createdCred.value.email}  ${createdCred.value.password}`)
-    copied.value = true
-  } catch (e) { /* clipboard unavailable */ }
+  const ok = await copyText(`${createdCred.value.email}  ${createdCred.value.password}`)
+  copied.value = ok
 }
 
 function updateRole(member, role) {

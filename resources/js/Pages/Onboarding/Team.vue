@@ -2,6 +2,7 @@
 import GuestLayout from '@/Layouts/GuestLayout.vue'
 import { Head, useForm, router } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
+import { copyText } from '@/utils/clipboard'
 
 const props = defineProps({
   workspaceName: String,
@@ -27,8 +28,9 @@ const emailDomain = computed(() => (props.host || 'company.com').replace(/^www\.
 const ready = computed(() => form.members.filter((m) => m.email.trim().includes('@')))
 
 const copiedId = ref(null)
-function copy(text, id) {
-  try { navigator.clipboard?.writeText(text) } catch (e) { /* noop */ }
+async function copy(text, id) {
+  const ok = await copyText(text)
+  if (!ok) return
   copiedId.value = id
   setTimeout(() => { if (copiedId.value === id) copiedId.value = null }, 1400)
 }

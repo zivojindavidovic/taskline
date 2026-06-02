@@ -928,6 +928,7 @@ import { ref, computed, reactive, watch, nextTick } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import axios from 'axios'
 import { useToast } from '@/composables/useToast'
+import { copyText } from '@/utils/clipboard'
 import Avatar from '@/Components/UI/Avatar.vue'
 import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
 import DropdownMenu from '@/Components/UI/DropdownMenu.vue'
@@ -1394,8 +1395,8 @@ function onSubtaskBlur() {
   if (newSubtaskTitle.value.trim()) submitSubtask()
   else cancelSubtask()
 }
-function copyId()   { navigator.clipboard?.writeText(props.task.key) }
-function copyLink() { navigator.clipboard?.writeText(window.location.href) }
+function copyId()   { copyText(props.task.key) }
+function copyLink() { copyText(window.location.href) }
 </script>
 
 <style scoped>
