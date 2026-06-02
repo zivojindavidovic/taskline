@@ -406,13 +406,21 @@ function updatePendingAccess(invite, projectIds) {
 .members-page {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 32px;
+  padding: 24px 32px 0;
   max-width: 860px;
   margin: 0 auto;
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0;
+}
+/* In-flow spacer: Firefox ignores a scroll container's padding-bottom when
+   content overflows, so the last card touches the edge. A non-shrinking flex
+   item reserves the bottom gap reliably across browsers. */
+.members-page::after {
+  content: '';
+  display: block;
+  flex: 0 0 24px;
 }
 
 /* Page header */
