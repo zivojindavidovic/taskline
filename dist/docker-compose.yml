@@ -1,0 +1,73 @@
+# =============================================================================
+# Taskline — self-hosted stack
+#
+# Run from inside this dist/ folder:
+#   1. cp .env.docker.example .env   and edit it
+#   2. docker compose pull
+#   3. docker compose up -d
+#
+# app and reverb share the same published image.
+# =============================================================================
+
+services:
+  app:
+    image: ${TASKLINE_IMAGE:-zivojindavidovic/taskline:latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TASKLINE_INIT: "1"          # this container runs migrations + asset sync
+    volumes:
+      - taskline-storage:/var/www/html/storage
+      - taskline-public:/var/www/html/public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [taskline]
+
+  reverb:
+    image: ${TASKLINE_IMAGE:-zivojindavidovic/taskline:latest}
+    restart: unless-stopped
+    command: php artisan reverb:start --host=0.0.0.0 --port=8081
+    env_file: .env
+    environment:
+      TASKLINE_INIT: "0"
+    volumes:
+      - taskline-storage:/var/www/html/storage
+    depends_on: [app]
+    networks: [taskline]
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx/taskline.conf:/etc/nginx/conf.d/default.conf:ro
+      - taskline-public:/var/www/html/public:ro
+    depends_on: [app, reverb]
+    networks: [taskline]
+
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-taskline}
+      POSTGRES_USER: ${DB_USERNAME:-taskline}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-taskline}
+    volumes:
+      - taskline-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-taskline} -d ${DB_DATABASE:-taskline}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    networks: [taskline]
+
+volumes:
+  taskline-db:
+  taskline-storage:
+  taskline-public:
+
+networks:
+  taskline:
+    driver: bridge

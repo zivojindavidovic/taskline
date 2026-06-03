@@ -1,0 +1,60 @@
+# NOTE: .dockerignore must live at the build-context root (the project root),
+# not in dist/. The build context is the project root because the image bakes
+# in the whole Laravel app; this file governs what gets sent to that context.
+
+# --- VCS / IDE ---
+.git
+.github
+.gitattributes
+.idea
+.vscode
+.zed
+.nova
+.fleet
+.DS_Store
+
+# --- Dependencies (come from build stages, not the context) ---
+node_modules
+vendor
+public/build
+public/hot
+public/storage
+
+# --- Local env / secrets ---
+.env
+.env.*
+!.env.example
+auth.json
+storage/*.key
+
+# --- Runtime / generated state ---
+storage/logs/*
+!storage/logs/.gitignore
+storage/framework/cache/*
+!storage/framework/cache/.gitignore
+storage/framework/sessions/*
+!storage/framework/sessions/.gitignore
+storage/framework/views/*
+!storage/framework/views/.gitignore
+bootstrap/cache/*.php
+
+# --- Tests / CI artifacts ---
+tests
+phpunit.xml
+.phpunit.result.cache
+.phpunit.cache
+
+# --- Dist: deploy-only files (NOT needed inside the image) ---
+# dist/.env* may hold secrets — never bake it in.
+# Keep dist/entrypoint.sh and dist/php/ OUT of this list: the Dockerfile COPYs them.
+dist/.env*
+dist/Dockerfile
+dist/docker-compose.yml
+dist/build-and-push.sh
+dist/DEPLOY.md
+dist/nginx
+.dockerignore
+
+# --- Misc ---
+*.log
+README.md

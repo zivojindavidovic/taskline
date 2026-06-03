@@ -35,6 +35,19 @@
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
+        <!-- Runtime config exposed to the SPA (keeps the built image host-independent) -->
+        <script>
+            window.__TASKLINE__ = {!! json_encode([
+                'appName' => config('app.name'),
+                'reverb' => [
+                    'key'    => config('taskline.reverb.key'),
+                    'host'   => config('taskline.reverb.host'),
+                    'port'   => config('taskline.reverb.port'),
+                    'scheme' => config('taskline.reverb.scheme'),
+                ],
+            ], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) !!};
+        </script>
+
         <!-- Scripts -->
         @routes
         @vite(['resources/js/app.js', "resources/js/Pages/{$page['component']}.vue"])
