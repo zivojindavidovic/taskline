@@ -18,7 +18,7 @@ it governs the Docker build context.
 | `dist/nginx/taskline.conf` | nginx vhost (php-fpm + `/app` Reverb proxy) |
 | `dist/docker-compose.yml` | Full self-hosted stack (app, reverb, nginx, postgres) |
 | `dist/.env.docker.example` | Environment template |
-| `dist/build-and-push.sh` | Build for `linux/amd64` and push to the registry |
+| `dist/build-and-push.sh` | Multi-arch build (`linux/amd64,linux/arm64`) + push to the registry |
 | `.dockerignore` *(project root)* | What gets sent to the build context |
 
 ---
@@ -34,9 +34,10 @@ docker login                       # once
 IMAGE=YOURUSER/taskline ./dist/build-and-push.sh
 ```
 
-This builds for `linux/amd64` (your server's arch) and pushes
-`YOURUSER/taskline:latest` plus a `:<git-sha>` tag. Override the tag with
-`TAG=1.0.0`, or build multi-arch with `PLATFORM=linux/amd64,linux/arm64`.
+This builds multi-arch for `linux/amd64,linux/arm64` (works on both Intel and
+ARM servers) and pushes `YOURUSER/taskline:latest` plus a `:<git-sha>` tag.
+Override the tag with `TAG=1.0.0`, or build a single arch faster with
+`PLATFORM=linux/arm64` (only that arch can pull the image then).
 
 > The websocket host/port/scheme are **not** baked into the build — they're
 > resolved at runtime, so one image works on any domain or IP.

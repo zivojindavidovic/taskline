@@ -5,7 +5,7 @@
 # Multi-stage: composer deps -> frontend build (node) -> final php-fpm runtime.
 #
 # IMPORTANT: the build context is the PROJECT ROOT, not dist/. Build with:
-#   docker buildx build --platform linux/amd64 -f dist/Dockerfile <project-root>
+#   docker buildx build --platform linux/amd64,linux/arm64 -f dist/Dockerfile <project-root>
 # (dist/build-and-push.sh does this for you. COPY paths below are relative to
 # the project root, hence `dist/php/...`, `dist/entrypoint.sh`.)
 # =============================================================================

@@ -12,11 +12,12 @@
 # (the image bakes in the whole Laravel app). It builds with `-f dist/Dockerfile`
 # and the project root as context.
 #
-# The target server is amd64. This script:
-#   * uses `docker buildx` to cross-build linux/amd64 when available, else
-#   * does a native build when the daemon itself is amd64 (e.g. run on the
-#     server), else
-#   * refuses, because a local arm64 build would NOT run on the amd64 server.
+# Builds multi-arch (linux/amd64 + linux/arm64) by default so the image runs
+# on either server architecture. This script:
+#   * uses `docker buildx` to build all platforms when available, else
+#   * does a single-arch native build when the daemon matches the (single)
+#     requested platform, else
+#   * refuses, because the resulting image would NOT run on the server.
 #
 # `docker login` must already be done.
 # =============================================================================
@@ -28,7 +29,7 @@ DOCKERFILE="$SCRIPT_DIR/Dockerfile"
 
 IMAGE="${IMAGE:-zivojindavidovic/taskline}"
 TAG="${TAG:-latest}"
-PLATFORM="${PLATFORM:-linux/amd64}"
+PLATFORM="${PLATFORM:-linux/amd64,linux/arm64}"
 GIT_SHA="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo manual)"
 
 if docker buildx version >/dev/null 2>&1; then
@@ -50,8 +51,9 @@ fi
 
 ARCH="$(docker info --format '{{.Architecture}}' 2>/dev/null || echo unknown)"
 case "$ARCH" in
-    x86_64 | amd64)
-        echo ">> No buildx, but daemon is amd64 — native build of ${IMAGE}:${TAG} (+ :${GIT_SHA})"
+    x86_64 | amd64 | aarch64 | arm64)
+        echo ">> No buildx — native single-arch (${ARCH}) build of ${IMAGE}:${TAG} (+ :${GIT_SHA})"
+        echo ">> NOTE: this pushes ONLY ${ARCH}; servers on the other arch cannot pull it."
         docker build --file "${DOCKERFILE}" --tag "${IMAGE}:${TAG}" --tag "${IMAGE}:${GIT_SHA}" "${REPO_ROOT}"
         docker push "${IMAGE}:${TAG}"
         docker push "${IMAGE}:${GIT_SHA}"
@@ -60,18 +62,14 @@ case "$ARCH" in
     *)
         cat >&2 <<EOF
 
-ERROR: docker buildx is not available and this daemon is '${ARCH}', not amd64.
-A local build here would produce an image that will NOT run on your amd64 server
-(exec format error).
+ERROR: docker buildx is not available and this daemon arch is '${ARCH}'.
+A multi-arch build (${PLATFORM}) requires buildx.
 
-Choose one:
-  1) Build on the server (recommended). Get the repo onto the amd64 server and
-     run this same script there — it does a native amd64 build + push.
-  2) Enable buildx on this machine:
-         brew install docker-buildx
-         mkdir -p ~/.docker/cli-plugins
-         ln -sf "\$(brew --prefix)/bin/docker-buildx" ~/.docker/cli-plugins/docker-buildx
-     then re-run this script (cross-builds amd64 via emulation; slower).
+Enable buildx on this machine:
+    brew install docker-buildx
+    mkdir -p ~/.docker/cli-plugins
+    ln -sf "\$(brew --prefix)/bin/docker-buildx" ~/.docker/cli-plugins/docker-buildx
+then re-run this script.
 EOF
         exit 1
         ;;
