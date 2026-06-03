@@ -11,8 +11,25 @@ use Illuminate\Http\Request;
 
 class SprintController extends Controller
 {
+    /**
+     * Sprint management (create/lock/unlock/complete/reopen) is reserved for
+     * workspace owners and admins — workspace members only work with tasks.
+     */
+    private function authorizeManage(Project $project): void
+    {
+        $workspace = $project->workspace;
+
+        abort_unless(
+            $workspace && $workspace->canManage(auth()->user()),
+            403,
+            'Only workspace owners and admins can manage sprints.'
+        );
+    }
+
     public function store(Request $request, Project $project): RedirectResponse
     {
+        $this->authorizeManage($project);
+
         $data = $request->validate([
             'name'       => 'required|string|max:100',
             'start_date' => 'nullable|date',
@@ -38,6 +55,8 @@ class SprintController extends Controller
 
     public function lock(Sprint $sprint): RedirectResponse
     {
+        $this->authorizeManage($sprint->project);
+
         $sprint->update(['locked' => true]);
 
         AuditLog::create([
@@ -54,6 +73,8 @@ class SprintController extends Controller
 
     public function unlock(Sprint $sprint): RedirectResponse
     {
+        $this->authorizeManage($sprint->project);
+
         $sprint->update(['locked' => false]);
 
         AuditLog::create([
@@ -70,6 +91,8 @@ class SprintController extends Controller
 
     public function complete(Sprint $sprint): RedirectResponse
     {
+        $this->authorizeManage($sprint->project);
+
         abort_if($sprint->status === 'completed', 422, 'Sprint is already completed.');
 
         $sprint->update(['status' => 'completed']);
@@ -88,6 +111,8 @@ class SprintController extends Controller
 
     public function reopen(Sprint $sprint): RedirectResponse
     {
+        $this->authorizeManage($sprint->project);
+
         abort_if($sprint->status !== 'completed', 422, 'Sprint is not completed.');
 
         $sprint->update(['status' => 'active']);

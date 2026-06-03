@@ -31,7 +31,7 @@
         <!-- Projects -->
         <div class="nav-section-label">
           <span>Projects</span>
-          <button v-if="workspace" class="section-add-btn" title="New project" @click="showNewProject = true">
+          <button v-if="workspace && canManageWorkspace" class="section-add-btn" title="New project" @click="showNewProject = true">
             <PlusIcon style="width:13px;height:13px" />
           </button>
         </div>
@@ -69,7 +69,7 @@
         <Avatar :name="user.name" :color="user.avatar_color || null" size="sm" />
         <div class="user-info">
           <div class="user-name">{{ user.name }}</div>
-          <div class="user-role">{{ isOwner ? 'Owner' : 'Member' }}</div>
+          <div class="user-role">{{ roleLabel }}</div>
         </div>
         <button class="logout-btn" title="Sign out" aria-label="Sign out" @click.stop="logout">
           <LogoutIcon style="width:14px;height:14px" />
@@ -93,7 +93,7 @@
   </div>
 
   <ToastContainer />
-  <NewProjectModal v-if="workspace" :show="showNewProject" @close="showNewProject = false" />
+  <NewProjectModal v-if="workspace && canManageWorkspace" :show="showNewProject" @close="showNewProject = false" />
   <WorkspaceSwitcherModal :show="showWorkspaceSwitcher" @close="showWorkspaceSwitcher = false" />
   <WorkspaceSettingsModal :show="showWorkspaceSettings" @close="showWorkspaceSettings = false" />
 </template>
@@ -150,6 +150,17 @@ const myTasksCount = computed(() => page.props.my_tasks_count ?? 0)
 const isOwner = computed(() =>
   workspace.value && workspace.value.owner_id === user.value?.id
 )
+
+// Owners and admins manage the workspace (new projects, sprints); members
+// and viewers only work with tasks. Role is shared by HandleInertiaRequests.
+const canManageWorkspace = computed(() =>
+  ['owner', 'admin'].includes(workspace.value?.role)
+)
+
+const roleLabel = computed(() => {
+  const role = workspace.value?.role ?? (isOwner.value ? 'owner' : 'member')
+  return role.charAt(0).toUpperCase() + role.slice(1)
+})
 
 function logout() {
   router.post(route('logout'))

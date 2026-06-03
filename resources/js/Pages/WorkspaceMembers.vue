@@ -55,7 +55,6 @@
           <select v-model="addForm.role" class="field-input role-select">
             <option value="admin">Admin</option>
             <option value="member">Member</option>
-            <option value="viewer">Viewer</option>
           </select>
           <div class="invite-access">
             <ProjectAccessControl
@@ -87,7 +86,6 @@
           <select v-model="inviteForm.role" class="field-input role-select">
             <option value="admin">Admin</option>
             <option value="member">Member</option>
-            <option value="viewer">Viewer</option>
           </select>
           <div class="invite-access">
             <ProjectAccessControl
@@ -161,11 +159,6 @@
                   <CheckIcon v-if="m.role === 'member'" class="check-icon" />
                   <span v-else class="check-spacer" />
                   Member
-                </MenuItem>
-                <MenuItem @click="updateRole(m, 'viewer')">
-                  <CheckIcon v-if="m.role === 'viewer'" class="check-icon" />
-                  <span v-else class="check-spacer" />
-                  Viewer
                 </MenuItem>
                 <div class="menu-divider-line" />
                 <MenuItem danger @click="removeMember(m)">

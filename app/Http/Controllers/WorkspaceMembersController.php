@@ -155,7 +155,7 @@ class WorkspaceMembersController extends Controller
         $data = $request->validate([
             'name'       => ['nullable', 'string', 'max:255'],
             'email'      => ['required', 'email', 'max:255'],
-            'role'       => ['required', 'in:admin,member,viewer'],
+            'role'       => ['required', 'in:admin,member'],
             'projects'   => ['sometimes', 'array'],
             'projects.*' => ['integer'],
         ]);
@@ -234,7 +234,7 @@ class WorkspaceMembersController extends Controller
 
         abort_unless($workspace && $workspace->owner_id === $user->id, 403);
 
-        $data = $request->validate(['role' => 'required|in:admin,member,viewer']);
+        $data = $request->validate(['role' => 'required|in:admin,member']);
 
         $workspace->users()->updateExistingPivot($member, ['role' => $data['role']]);
 

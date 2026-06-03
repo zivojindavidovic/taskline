@@ -18,7 +18,7 @@ class InviteMemberRequest extends FormRequest
     {
         return [
             'email'      => 'required|email|max:255',
-            'role'       => 'required|in:admin,member,viewer',
+            'role'       => 'required|in:admin,member',
             'projects'   => 'sometimes|array',
             'projects.*' => 'integer',
         ];

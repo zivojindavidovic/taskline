@@ -76,11 +76,13 @@
           </MenuItem>
         </template>
 
-        <div class="sprint-dd-divider" />
-        <MenuItem @click="showNewSprint = true">
-          <PlusIcon />
-          <span>New sprint</span>
-        </MenuItem>
+        <template v-if="canManageSprints">
+          <div class="sprint-dd-divider" />
+          <MenuItem @click="showNewSprint = true">
+            <PlusIcon />
+            <span>New sprint</span>
+          </MenuItem>
+        </template>
       </DropdownMenu>
 
       <!-- Sprint meta: dates + days remaining -->
@@ -190,36 +192,39 @@
         ><ListIcon style="width:14px;height:14px" /> List</button>
       </div>
 
-      <!-- Lock / Unlock sprint (hidden once sprint is completed) -->
-      <template v-if="currentSprint && !isAll && !isBacklog && currentSprint.status !== 'completed' && !currentSprint.locked">
-        <button type="button" class="btn-secondary" @click="showLockModal = true">
-          <LockIcon style="width:14px;height:14px" /> Lock sprint
-        </button>
-      </template>
-      <template v-else-if="currentSprint && !isAll && !isBacklog && currentSprint.status !== 'completed' && currentSprint.locked">
-        <button type="button" class="btn-secondary" @click="unlockSprint">
-          <LockIcon style="width:14px;height:14px" /> Unlock
-        </button>
-      </template>
+      <!-- Sprint management — workspace owners/admins only -->
+      <template v-if="canManageSprints">
+        <!-- Lock / Unlock sprint (hidden once sprint is completed) -->
+        <template v-if="currentSprint && !isAll && !isBacklog && currentSprint.status !== 'completed' && !currentSprint.locked">
+          <button type="button" class="btn-secondary" @click="showLockModal = true">
+            <LockIcon style="width:14px;height:14px" /> Lock sprint
+          </button>
+        </template>
+        <template v-else-if="currentSprint && !isAll && !isBacklog && currentSprint.status !== 'completed' && currentSprint.locked">
+          <button type="button" class="btn-secondary" @click="unlockSprint">
+            <LockIcon style="width:14px;height:14px" /> Unlock
+          </button>
+        </template>
 
-      <!-- Complete / Reopen sprint -->
-      <button
-        v-if="currentSprint && !isAll && !isBacklog && currentSprint.status !== 'completed'"
-        type="button"
-        class="btn-primary"
-        title="Mark this sprint as completed"
-        @click="completeSprint"
-      >
-        <CheckIcon style="width:14px;height:14px" /> Complete sprint
-      </button>
-      <button
-        v-else-if="currentSprint && !isAll && !isBacklog && currentSprint.status === 'completed'"
-        type="button"
-        class="btn-secondary"
-        @click="reopenSprint"
-      >
-        <LightningIcon style="width:14px;height:14px" /> Reopen sprint
-      </button>
+        <!-- Complete / Reopen sprint -->
+        <button
+          v-if="currentSprint && !isAll && !isBacklog && currentSprint.status !== 'completed'"
+          type="button"
+          class="btn-primary"
+          title="Mark this sprint as completed"
+          @click="completeSprint"
+        >
+          <CheckIcon style="width:14px;height:14px" /> Complete sprint
+        </button>
+        <button
+          v-else-if="currentSprint && !isAll && !isBacklog && currentSprint.status === 'completed'"
+          type="button"
+          class="btn-secondary"
+          @click="reopenSprint"
+        >
+          <LightningIcon style="width:14px;height:14px" /> Reopen sprint
+        </button>
+      </template>
     </div>
 
     <!-- Locked banner -->
@@ -340,6 +345,7 @@
 
     <!-- New sprint modal -->
     <NewSprintModal
+      v-if="canManageSprints"
       :show="showNewSprint"
       :projectId="project.uuid"
       @close="showNewSprint = false"
@@ -347,6 +353,7 @@
 
     <!-- Lock sprint modal -->
     <LockSprintModal
+      v-if="canManageSprints"
       :show="showLockModal"
       :sprint="currentSprint"
       :tasks="tasks"
@@ -357,7 +364,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 import axios from 'axios'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import KanbanBoard from '@/Components/Board/KanbanBoard.vue'
@@ -395,6 +402,13 @@ const props = defineProps({
 })
 
 const { toast } = useToast()
+const page = usePage()
+
+// Sprint management (create/lock/unlock/complete/reopen) is reserved for
+// workspace owners and admins — mirrors the SprintController authorization.
+const canManageSprints = computed(() =>
+  ['owner', 'admin'].includes(page.props.workspace?.role)
+)
 
 // Local tasks mirror — updated optimistically on drag-drop so the board
 // doesn't blink while waiting for the Inertia round-trip.

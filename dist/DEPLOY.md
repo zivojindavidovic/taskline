@@ -77,6 +77,9 @@ left it blank.
 docker compose pull && docker compose up -d
 ```
 
+The full release procedure (build, push, server steps, rollback) is documented
+step by step in [`UPDATE.md`](UPDATE.md).
+
 ---
 
 ## C. Migrating your existing manual setup (`/opt/...`)

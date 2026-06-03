@@ -58,7 +58,12 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user,
             ],
             'deployment' => Deployment::resolve($request),
-            'workspace'  => $workspace ? $workspace->only(['id', 'name', 'color', 'owner_id']) : null,
+            // 'role' drives what the UI offers: owners/admins manage projects
+            // and sprints, members only work with tasks.
+            'workspace'  => $workspace ? [
+                ...$workspace->only(['id', 'name', 'color', 'owner_id']),
+                'role' => $workspace->roleOf($user),
+            ] : null,
             'workspaces' => $workspaces,
             'projects' => $user
                 ? \App\Models\Project::where(function ($q) use ($user) {

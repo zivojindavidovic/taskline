@@ -27,6 +27,13 @@ class ProjectController extends Controller
             'You must create a workspace before adding projects.'
         );
 
+        // Creating projects is reserved for workspace owners and admins.
+        abort_unless(
+            $user->currentWorkspace?->canManage($user),
+            403,
+            'Only workspace owners and admins can create projects.'
+        );
+
         $workspaceId = $user->current_workspace_id;
 
         // Project name and key must be unique within the workspace — two
