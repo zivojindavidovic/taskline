@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -88,6 +89,84 @@ class Task extends Model
     public function subtasks(): HasMany
     {
         return $this->hasMany(Task::class, 'parent_task_id')->orderBy('created_at');
+    }
+
+    /**
+     * Relations the task panel renders on every node of a subtask tree. Shared
+     * by the board, the standalone details endpoint, and the realtime broadcasts
+     * so a subtask carries the same shape no matter how it reaches the client.
+     *
+     * @return array<int|string, mixed>
+     */
+    public static function subtaskTreeRelations(): array
+    {
+        return [
+            'assignee:id,name,email,avatar_color',
+            'assignees:id,name,email,avatar_color',
+            'boardColumn:id,name,color',
+            'comments' => fn ($q) => $q->oldest(),
+            'comments.user:id,name,email,avatar_color',
+            'comments.mentionedUsers:id,name,email,avatar_color',
+            'comments.replies' => fn ($q) => $q->oldest(),
+            'comments.replies.user:id,name,email,avatar_color',
+        ];
+    }
+
+    /**
+     * Eager-load the entire subtask subtree (subtasks of subtasks, to any depth)
+     * onto each task's `subtasks` relation, with the panel relations on every
+     * node. Walks one depth level at a time across the whole set, so a tree of
+     * depth N costs N queries total — not one per node. A node with no children
+     * ends up with an empty `subtasks` collection (serializes to `[]`).
+     *
+     * @param  Collection<int, Task>  $tasks
+     */
+    public static function loadSubtaskTrees(Collection $tasks): void
+    {
+        $level = $tasks;
+        while ($level->isNotEmpty()) {
+            $level->load(['subtasks' => fn ($q) => $q->with(static::subtaskTreeRelations())]);
+
+            $next = [];
+            foreach ($level as $node) {
+                foreach ($node->subtasks as $child) {
+                    $next[] = $child;
+                }
+            }
+            $level = new Collection($next);
+        }
+    }
+
+    /** Eager-load the full subtask tree onto this single task. */
+    public function loadSubtaskTree(): static
+    {
+        static::loadSubtaskTrees(new Collection([$this]));
+
+        return $this;
+    }
+
+    /**
+     * IDs of every task beneath this one in the subtask tree (children, their
+     * children, and so on). Used to cascade a delete across the whole subtree so
+     * deleting a parent never orphans its descendants to the top level.
+     *
+     * @return array<int, int>
+     */
+    public function descendantIds(): array
+    {
+        $ids = [];
+        $frontier = [$this->id];
+
+        while (!empty($frontier)) {
+            $children = static::whereIn('parent_task_id', $frontier)->pluck('id')->all();
+            if (empty($children)) {
+                break;
+            }
+            $ids = array_merge($ids, $children);
+            $frontier = $children;
+        }
+
+        return $ids;
     }
 
     public function attachments(): HasMany

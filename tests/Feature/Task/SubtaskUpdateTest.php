@@ -84,7 +84,7 @@ class SubtaskUpdateTest extends TestCase
         $user ??= $this->owner;
         return $this->actingAs($user)
             ->withHeaders(['Accept' => 'application/json'])
-            ->patch(route('tasks.subtasks.update', [$this->parentTask->id, $this->subtask->id]), $data);
+            ->patch(route('tasks.subtasks.update', [$this->parentTask->uuid, $this->subtask->uuid]), $data);
     }
 
     // ─── Happy-path field updates ───────────────────────────────────────────
@@ -259,17 +259,26 @@ class SubtaskUpdateTest extends TestCase
     public function test_unauthenticated_cannot_update_subtask(): void
     {
         $this->withHeaders(['Accept' => 'application/json'])
-            ->patch(route('tasks.subtasks.update', [$this->parentTask->id, $this->subtask->id]), ['title' => 'x'])
+            ->patch(route('tasks.subtasks.update', [$this->parentTask->uuid, $this->subtask->uuid]), ['title' => 'x'])
             ->assertUnauthorized();
     }
 
     public function test_non_member_cannot_update_subtask(): void
     {
+        // The outsider owns their own (unrelated) workspace so they clear the
+        // onboarding gate — the point under test is project-level access (403),
+        // not onboarding.
         $outsider = User::factory()->create();
+        $outsiderWs = Workspace::create([
+            'name'     => 'Outsider Workspace',
+            'owner_id' => $outsider->id,
+            'color'    => '#000000',
+        ]);
+        $outsiderWs->users()->attach($outsider->id, ['role' => 'owner']);
 
         $this->actingAs($outsider)
             ->withHeaders(['Accept' => 'application/json'])
-            ->patch(route('tasks.subtasks.update', [$this->parentTask->id, $this->subtask->id]), ['title' => 'x'])
+            ->patch(route('tasks.subtasks.update', [$this->parentTask->uuid, $this->subtask->uuid]), ['title' => 'x'])
             ->assertForbidden();
     }
 
@@ -281,7 +290,7 @@ class SubtaskUpdateTest extends TestCase
 
         $this->actingAs($member)
             ->withHeaders(['Accept' => 'application/json'])
-            ->patch(route('tasks.subtasks.update', [$this->parentTask->id, $this->subtask->id]), ['title' => 'By member'])
+            ->patch(route('tasks.subtasks.update', [$this->parentTask->uuid, $this->subtask->uuid]), ['title' => 'By member'])
             ->assertRedirect();
 
         $this->assertDatabaseHas('tasks', [
@@ -304,7 +313,7 @@ class SubtaskUpdateTest extends TestCase
         // Route uses $otherParent but $this->subtask belongs to $this->parentTask
         $this->actingAs($this->owner)
             ->withHeaders(['Accept' => 'application/json'])
-            ->patch(route('tasks.subtasks.update', [$otherParent->id, $this->subtask->id]), ['title' => 'x'])
+            ->patch(route('tasks.subtasks.update', [$otherParent->uuid, $this->subtask->uuid]), ['title' => 'x'])
             ->assertNotFound();
     }
 }

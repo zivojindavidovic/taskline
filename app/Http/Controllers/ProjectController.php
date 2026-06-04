@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\MemberProjectAccessUpdated;
 use App\Events\ProjectCreated;
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\User;
 use App\Services\FilterService;
 use Illuminate\Http\RedirectResponse;
@@ -220,16 +221,6 @@ class ProjectController extends Controller
                 'activities.user:id,name,email,avatar_color',
                 'activities.subtask:id,key,title',
                 'completedByUser:id,name,avatar_color',
-                'subtasks' => fn ($q) => $q->with([
-                    'assignee:id,name,email,avatar_color',
-                    'assignees:id,name,email,avatar_color',
-                    'boardColumn:id,name,color',
-                    'comments' => fn ($q2) => $q2->oldest(),
-                    'comments.user:id,name,email,avatar_color',
-                    'comments.mentionedUsers:id,name,email,avatar_color',
-                    'comments.replies' => fn ($q2) => $q2->oldest(),
-                    'comments.replies.user:id,name,email,avatar_color',
-                ]),
                 'attachments' => fn ($q) => $q->latest(),
                 'attachments.uploader:id,name,avatar_color',
             ]);
@@ -241,6 +232,11 @@ class ProjectController extends Controller
         } else {
             $tasks = $sprint ? $taskQuery->where('sprint_id', $sprint->id)->get() : collect();
         }
+
+        // Hydrate the full subtask tree (subtasks of subtasks, any depth) so the
+        // panel can render and drill into nested subtasks straight from the board
+        // props — one query per depth level, not per task.
+        Task::loadSubtaskTrees($tasks instanceof \Illuminate\Database\Eloquent\Collection ? $tasks : new \Illuminate\Database\Eloquent\Collection($tasks->all()));
 
         $workspace = $project->workspace;
         $members = $workspace->users()->get(['users.id', 'users.name', 'users.email', 'users.avatar_color']);

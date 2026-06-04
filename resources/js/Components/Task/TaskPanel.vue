@@ -353,9 +353,18 @@
             <span
               class="subtask-title"
               :class="{ done: sub.completed }"
-              @click="openSubtaskId = sub.id"
+              @click="subtaskPath = [sub.id]"
             >{{ sub.title }}</span>
             <div class="subtask-chips">
+              <span
+                v-if="sub.subtasks?.length"
+                class="subtask-count"
+                :title="`${sub.subtasks.length} subtasks`"
+                @click="subtaskPath = [sub.id]"
+              >
+                <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                {{ subtaskChildCount(sub) }}
+              </span>
               <span
                 v-if="sub.due_date"
                 class="subtask-due"
@@ -627,15 +636,15 @@
 
   <!-- Subtask detail panel — slides over the task panel, design 1:1 -->
   <template v-if="openSubtask">
-    <div class="side-panel-backdrop subtask-layer" @click="openSubtaskId = null" />
+    <div class="side-panel-backdrop subtask-layer" @click="closeSubtaskPanel" />
     <div class="side-panel subtask-layer" role="dialog" aria-label="Subtask details">
       <div class="panel-header">
-        <button type="button" class="btn ghost sm crumb" @click="openSubtaskId = null">
+        <button type="button" class="btn ghost sm crumb" @click="goBackSubtask">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          <span class="crumb-text">{{ task.title }}</span>
+          <span class="crumb-text">{{ subtaskParentTitle }}</span>
         </button>
         <div class="spacer" />
-        <button type="button" class="btn ghost icon-only sm" aria-label="Close" @click="openSubtaskId = null"><CloseIcon /></button>
+        <button type="button" class="btn ghost icon-only sm" aria-label="Close" @click="closeSubtaskPanel"><CloseIcon /></button>
       </div>
 
       <div class="panel-body">
@@ -841,6 +850,98 @@
           @remove="onSubtaskAttachmentRemove"
         />
 
+        <!-- Nested subtasks — subtasks of this subtask (design 1:1) -->
+        <div class="panel-section">
+          <div class="section-head">
+            <div class="head-left">
+              <span class="panel-section-title">Subtasks</span>
+              <span v-if="openSubtaskChildren.length" class="count-mono">
+                {{ nestedDoneCount }}/{{ openSubtaskChildren.length }}
+              </span>
+            </div>
+            <button
+              v-if="!locked"
+              type="button"
+              class="btn ghost sm"
+              @click="openNestedSubtaskInput"
+            >+ Add</button>
+          </div>
+
+          <div v-if="openSubtaskChildren.length" class="subtask-progress">
+            <div class="bar" :style="{ width: nestedProgress + '%' }" />
+          </div>
+
+          <p v-if="!openSubtaskChildren.length && !showNestedSubtaskInput" class="muted small-pad">No subtasks yet.</p>
+
+          <div v-if="openSubtaskChildren.length" class="subtask-list">
+            <div
+              v-for="sub in openSubtaskChildren"
+              :key="sub.id"
+              class="subtask-row"
+              @mouseenter="hoveredNestedId = sub.id"
+              @mouseleave="hoveredNestedId = null"
+            >
+              <button
+                type="button"
+                class="subtask-check"
+                :class="{ done: sub.completed }"
+                :disabled="locked"
+                @click.stop="$emit('subtaskToggle', sub.id, !sub.completed)"
+              >
+                <CheckIcon v-if="sub.completed" />
+              </button>
+              <span
+                class="subtask-title"
+                :class="{ done: sub.completed }"
+                @click="drillIntoSubtask(sub.id)"
+              >{{ sub.title }}</span>
+              <div class="subtask-chips">
+                <span
+                  v-if="sub.subtasks?.length"
+                  class="subtask-count"
+                  :title="`${sub.subtasks.length} subtasks`"
+                  @click="drillIntoSubtask(sub.id)"
+                >
+                  <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                  {{ subtaskChildCount(sub) }}
+                </span>
+                <span
+                  v-if="sub.due_date"
+                  class="subtask-due"
+                  :class="{ urgent: subDueInfo(sub).urgent }"
+                >{{ subDueInfo(sub).label }}</span>
+                <span
+                  v-if="sub.priority && sub.priority !== 'med'"
+                  class="subtask-prio"
+                  :style="{ background: priorityColor(sub.priority) }"
+                  :title="sub.priority"
+                />
+                <Avatar v-if="sub.assignee" :name="sub.assignee.name" size="sm" />
+              </div>
+              <button
+                v-if="!locked && hoveredNestedId === sub.id"
+                type="button"
+                class="subtask-remove"
+                :aria-label="`Remove ${sub.title}`"
+                @click.stop="$emit('subtaskRemove', sub.id)"
+              ><CloseIcon /></button>
+            </div>
+          </div>
+
+          <div v-if="showNestedSubtaskInput" class="subtask-add-row">
+            <div class="subtask-check empty" />
+            <input
+              ref="nestedSubtaskInputEl"
+              v-model="newNestedSubtaskTitle"
+              class="input"
+              placeholder="Subtask title… (Enter to save)"
+              @keydown.enter.prevent="submitNestedSubtask"
+              @keydown.escape="cancelNestedSubtask"
+              @blur="onNestedSubtaskBlur"
+            />
+          </div>
+        </div>
+
         <!-- Subtask Comments -->
         <div class="panel-section">
           <div class="minitabs">
@@ -958,8 +1059,49 @@ const emit = defineEmits([
 ])
 
 const hoveredSubtaskId = ref(null)
-const openSubtaskId    = ref(null)
-const openSubtask      = computed(() => props.task.subtasks?.find(s => s.id === openSubtaskId.value) || null)
+const hoveredNestedId  = ref(null)
+
+// Drill stack of subtask ids from the root task down to the currently open
+// subtask. A single id means "a direct child of the root is open"; pushing more
+// ids descends into subtasks-of-subtasks to any depth (design 1:1).
+const subtaskPath = ref([])
+
+// Walk the loaded subtask tree following the id path; returns the deepest node
+// (or null if any link is missing, e.g. after a delete).
+function resolveSubtaskPath(ids) {
+  let nodes = props.task.subtasks || []
+  let node = null
+  for (const id of ids) {
+    node = nodes.find(s => s.id === id) || null
+    if (!node) return null
+    nodes = node.subtasks || []
+  }
+  return node
+}
+
+const openSubtask = computed(() => subtaskPath.value.length ? resolveSubtaskPath(subtaskPath.value) : null)
+
+// One level up from the open subtask: its parent subtask, or the root task when
+// the open subtask is a direct child of the root. Drives the back crumb.
+const openSubtaskParent = computed(() =>
+  subtaskPath.value.length <= 1 ? props.task : resolveSubtaskPath(subtaskPath.value.slice(0, -1))
+)
+const subtaskParentTitle  = computed(() => openSubtaskParent.value?.title || props.task.title)
+const openSubtaskChildren = computed(() => openSubtask.value?.subtasks || [])
+const nestedDoneCount     = computed(() => openSubtaskChildren.value.filter(s => s.completed).length)
+const nestedProgress      = computed(() => {
+  const total = openSubtaskChildren.value.length
+  return total === 0 ? 0 : Math.round((nestedDoneCount.value / total) * 100)
+})
+
+function drillIntoSubtask(id) { subtaskPath.value = [...subtaskPath.value, id] }
+function goBackSubtask()       { subtaskPath.value = subtaskPath.value.slice(0, -1) }
+function closeSubtaskPanel()   { subtaskPath.value = [] }
+function subtaskChildCount(sub) {
+  const direct = sub.subtasks?.length ?? 0
+  const done = sub.subtasks?.filter(s => s.completed).length ?? 0
+  return `${done}/${direct}`
+}
 
 const taskProject = computed(() =>
   props.allProjects.find(p => p.id === (props.task.project_id ?? props.project?.id)) ?? props.project
@@ -994,6 +1136,9 @@ const descEl           = ref(null)
 const showSubtaskInput = ref(false)
 const newSubtaskTitle  = ref('')
 const subtaskInputEl   = ref(null)
+const showNestedSubtaskInput = ref(false)
+const newNestedSubtaskTitle  = ref('')
+const nestedSubtaskInputEl   = ref(null)
 const tagSearch        = ref('')
 
 const PRIORITIES = [
@@ -1383,7 +1528,8 @@ function openSubtaskInput() {
 function submitSubtask() {
   const title = newSubtaskTitle.value.trim()
   if (!title) return
-  emit('subtask', { title })
+  // Second arg = parent id. Top-level subtasks hang off the root task.
+  emit('subtask', { title }, props.task.id)
   newSubtaskTitle.value = ''
   showSubtaskInput.value = false
 }
@@ -1394,6 +1540,29 @@ function cancelSubtask() {
 function onSubtaskBlur() {
   if (newSubtaskTitle.value.trim()) submitSubtask()
   else cancelSubtask()
+}
+
+// ── Nested subtasks (subtasks of the open subtask) ──
+function openNestedSubtaskInput() {
+  showNestedSubtaskInput.value = true
+  nextTick(() => nestedSubtaskInputEl.value?.focus())
+}
+function submitNestedSubtask() {
+  const title = newNestedSubtaskTitle.value.trim()
+  if (!title || !openSubtask.value) return
+  // Parent is the currently open subtask — this is what creates a subtask
+  // inside a subtask.
+  emit('subtask', { title }, openSubtask.value.id)
+  newNestedSubtaskTitle.value = ''
+  showNestedSubtaskInput.value = false
+}
+function cancelNestedSubtask() {
+  newNestedSubtaskTitle.value = ''
+  showNestedSubtaskInput.value = false
+}
+function onNestedSubtaskBlur() {
+  if (newNestedSubtaskTitle.value.trim()) submitNestedSubtask()
+  else cancelNestedSubtask()
 }
 function copyId()   { copyText(props.task.key) }
 function copyLink() { copyText(window.location.href) }
@@ -1600,6 +1769,13 @@ function copyLink() { copyText(window.location.href) }
 .subtask-chips {
   display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
 }
+.subtask-count {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; font-family: var(--font-mono);
+  color: var(--fg-subtle); white-space: nowrap; cursor: pointer;
+}
+.subtask-count:hover { color: var(--accent); }
+.subtask-count svg { opacity: .7; }
 .subtask-due {
   font-size: 11px; font-family: var(--font-mono);
   color: var(--fg-subtle); white-space: nowrap;

@@ -155,13 +155,8 @@ class TaskService
             'meta'       => ['subtask_key' => $subtask->key, 'title' => $subtask->title],
         ]);
 
-        $parent->refresh()->load([
-            'assignee',
-            'assignees',
-            'subtasks.assignee',
-            'subtasks.assignees',
-            'subtasks.boardColumn',
-        ]);
+        $parent->refresh()->load(['assignee', 'assignees']);
+        $parent->loadSubtaskTree();
         broadcast(new TaskUpdated($parent))->toOthers();
 
         return $subtask;
@@ -202,13 +197,8 @@ class TaskService
             'meta'       => ['subtask_key' => $subtask->key, 'changes' => $changes],
         ]);
 
-        $parent->refresh()->load([
-            'assignee',
-            'assignees',
-            'subtasks.assignee',
-            'subtasks.assignees',
-            'subtasks.boardColumn',
-        ]);
+        $parent->refresh()->load(['assignee', 'assignees']);
+        $parent->loadSubtaskTree();
         broadcast(new TaskUpdated($parent))->toOthers();
 
         return $subtask;

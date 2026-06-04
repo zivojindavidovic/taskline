@@ -178,19 +178,13 @@ class TaskController extends Controller
             'activities.user:id,name,email,avatar_color',
             'activities.subtask:id,key,title',
             'completedByUser:id,name,avatar_color',
-            'subtasks' => fn ($q) => $q->with([
-                'assignee:id,name,email,avatar_color',
-                'assignees:id,name,email,avatar_color',
-                'boardColumn:id,name,color',
-                'comments' => fn ($q2) => $q2->oldest(),
-                'comments.user:id,name,email,avatar_color',
-                'comments.mentionedUsers:id,name,email,avatar_color',
-                'comments.replies' => fn ($q2) => $q2->oldest(),
-                'comments.replies.user:id,name,email,avatar_color',
-            ]),
             'attachments' => fn ($q) => $q->latest(),
             'attachments.uploader:id,name,avatar_color',
         ]);
+
+        // Load the full subtask tree (subtasks of subtasks, any depth) so the
+        // panel can render and drill through nested subtasks.
+        $task->loadSubtaskTree();
 
         $project = $task->project;
         $columns = $project->boardColumns()->orderBy('position')->get();
@@ -300,13 +294,8 @@ class TaskController extends Controller
             if (! $parent) {
                 return;
             }
-            $parent->load([
-                'assignee',
-                'assignees',
-                'subtasks.assignee',
-                'subtasks.assignees',
-                'subtasks.boardColumn',
-            ]);
+            $parent->load(['assignee', 'assignees']);
+            $parent->loadSubtaskTree();
             broadcast(new TaskUpdated($parent))->toOthers();
 
             return;

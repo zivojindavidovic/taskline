@@ -582,12 +582,12 @@ onMounted(() => {
           owner.comments.push(comment)
         }
       }
-      // task_id may be a top-level task OR a subtask. Subtasks aren't in
-      // localTasks (top-level only), so also look inside each task's subtasks.
+      // task_id may be a top-level task OR a subtask at any depth. Subtasks
+      // aren't in localTasks (top-level only), so search each task's whole tree.
       const findOwner = (task) => {
         if (!task) return null
         if (task.id === task_id) return task
-        return (task.subtasks ?? []).find(s => s.id === task_id) ?? null
+        return findSubtaskNode(task_id, task)
       }
       const localOwner = findOwner(localTasks.value.find(t => t.id === task_id))
         ?? localTasks.value.map(findOwner).find(Boolean)
@@ -605,12 +605,12 @@ onMounted(() => {
           comment.replies.push(reply)
         }
       }
-      // task_id may be a subtask id — replies live on the subtask itself, which
-      // is nested under its parent, so look one level down as well.
+      // task_id may be a subtask id at any depth — replies live on the subtask
+      // itself, so search the whole tree under each root.
       const findTask = (root) => {
         if (!root) return null
         if (root.id === task_id) return root
-        return (root.subtasks ?? []).find(s => s.id === task_id) ?? null
+        return findSubtaskNode(task_id, root)
       }
       localTasks.value.forEach(t => appendReply(findTask(t)))
       appendReply(findTask(activeTask.value))
@@ -797,7 +797,29 @@ const sprintBadgeStyle = computed(() => {
 // and request bodies like board_column_id), so these helpers map an integer id
 // to the matching uuid for the route() argument only.
 const findTaskUuid    = (id) => localTasks.value.find(t => t.id === id)?.uuid ?? id
-const findSubtaskUuid = (id) => activeTask.value?.subtasks?.find(s => s.id === id)?.uuid ?? id
+
+// Subtasks nest to any depth, so resolve ids by walking the whole tree of the
+// open task — not just its direct children.
+function findSubtaskNode(id, node = activeTask.value) {
+  for (const s of node?.subtasks ?? []) {
+    if (s.id === id) return s
+    const deep = findSubtaskNode(id, s)
+    if (deep) return deep
+  }
+  return null
+}
+function findSubtaskParentNode(id, node = activeTask.value) {
+  for (const s of node?.subtasks ?? []) {
+    if (s.id === id) return node
+    const deep = findSubtaskParentNode(id, s)
+    if (deep) return deep
+  }
+  return null
+}
+const findSubtaskUuid       = (id) => findSubtaskNode(id)?.uuid ?? id
+// The uuid of a subtask's immediate parent — a parent subtask when nested, or
+// the root task for a top-level subtask. Needed for the subtasks.update route.
+const findSubtaskParentUuid = (id) => findSubtaskParentNode(id)?.uuid ?? activeTask.value?.uuid
 const findColumnUuid  = (id) => props.columns?.find(c => c.id === id)?.uuid ?? id
 const findSprintUuid  = (id) => props.sprints?.find(s => s.id === id)?.uuid ?? id
 
@@ -897,8 +919,13 @@ function postReply(commentId, body) {
   router.post(route('tasks.comments.reply', [activeTask.value.uuid, commentId]), { body }, { preserveScroll: true })
 }
 
-function addSubtask(data) {
-  router.post(route('tasks.subtasks.store', activeTask.value.uuid), data, { preserveScroll: true })
+function addSubtask(data, parentId) {
+  // parentId is the immediate parent: the root task for a top-level subtask, or
+  // a subtask id when creating a subtask inside a subtask.
+  const parentUuid = (parentId == null || parentId === activeTask.value?.id)
+    ? activeTask.value.uuid
+    : findSubtaskUuid(parentId)
+  router.post(route('tasks.subtasks.store', parentUuid), data, { preserveScroll: true })
 }
 
 function toggleSubtask(subtaskId, completed) {
@@ -911,7 +938,7 @@ function removeSubtask(subtaskId) {
 }
 
 function handleSubtaskUpdate(subtaskId, data) {
-  router.patch(route('tasks.subtasks.update', [activeTask.value.uuid, findSubtaskUuid(subtaskId)]), data, {
+  router.patch(route('tasks.subtasks.update', [findSubtaskParentUuid(subtaskId), findSubtaskUuid(subtaskId)]), data, {
     preserveScroll: true,
   })
 }

@@ -103,7 +103,25 @@ function refetch() {
 }
 
 // Routes expose uuids; subtasks emit their integer id, so map it to the uuid.
-const subtaskUuid = (id) => task.value?.subtasks?.find(s => s.id === id)?.uuid ?? id
+// Subtasks nest to any depth, so search the whole tree, not just direct children.
+function findSubtaskNode(id, node = task.value) {
+  for (const s of node?.subtasks ?? []) {
+    if (s.id === id) return s
+    const deep = findSubtaskNode(id, s)
+    if (deep) return deep
+  }
+  return null
+}
+function findSubtaskParentNode(id, node = task.value) {
+  for (const s of node?.subtasks ?? []) {
+    if (s.id === id) return node
+    const deep = findSubtaskParentNode(id, s)
+    if (deep) return deep
+  }
+  return null
+}
+const subtaskUuid       = (id) => findSubtaskNode(id)?.uuid ?? id
+const subtaskParentUuid = (id) => findSubtaskParentNode(id)?.uuid ?? task.value?.uuid
 
 watch(() => props.taskId, (id) => load(id), { immediate: true })
 
@@ -149,8 +167,12 @@ function postSubtaskComment(subtaskId, body) {
 function postSubtaskReply(subtaskId, commentId, body) {
   router.post(route('tasks.comments.reply', [subtaskUuid(subtaskId), commentId]), { body }, opts(refetch))
 }
-function addSubtask(data) {
-  router.post(route('tasks.subtasks.store', task.value.uuid), data, opts(refetch))
+function addSubtask(data, parentId) {
+  // parentId is the immediate parent: the root task, or a subtask for nesting.
+  const parentUuid = (parentId == null || parentId === task.value?.id)
+    ? task.value.uuid
+    : subtaskUuid(parentId)
+  router.post(route('tasks.subtasks.store', parentUuid), data, opts(refetch))
 }
 function toggleSubtask(subtaskId, completed) {
   const routeName = completed ? 'tasks.complete' : 'tasks.uncomplete'
@@ -160,7 +182,7 @@ function removeSubtask(subtaskId) {
   router.delete(route('tasks.destroy', subtaskUuid(subtaskId)), opts(refetch))
 }
 function handleSubtaskUpdate(subtaskId, data) {
-  router.patch(route('tasks.subtasks.update', [task.value.uuid, subtaskUuid(subtaskId)]), data, opts(refetch))
+  router.patch(route('tasks.subtasks.update', [subtaskParentUuid(subtaskId), subtaskUuid(subtaskId)]), data, opts(refetch))
 }
 function uploadAttachment(file) {
   const form = new FormData()
