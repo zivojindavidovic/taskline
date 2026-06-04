@@ -18,6 +18,7 @@ it governs the Docker build context.
 | `dist/nginx/taskline.conf` | nginx vhost (php-fpm + `/app` Reverb proxy) |
 | `dist/docker-compose.yml` | Full self-hosted stack (app, reverb, nginx, postgres) |
 | `dist/.env.docker.example` | Environment template |
+| `dist/BACKUP.md` | Backup & restore procedure (database, storage, `.env`) |
 | `dist/build-and-push.sh` | Multi-arch build (`linux/amd64,linux/arm64`) + push to the registry |
 | `.dockerignore` *(project root)* | What gets sent to the build context |
 
@@ -71,6 +72,13 @@ left it blank.
   to `reverb:8081` over plain HTTP on the internal network.
 - **No queue worker** is needed: all broadcast events are `ShouldBroadcastNow`
   (synchronous) and `QUEUE_CONNECTION=sync` runs any future queued work inline.
+
+### Backups
+
+Backups are your responsibility as the operator — the stack does **not** back
+anything up for you. What to back up (database, storage volume, `.env`), how,
+and how to restore is documented step by step in [`BACKUP.md`](BACKUP.md).
+Back up the database before every upgrade.
 
 ### Upgrading
 ```bash
