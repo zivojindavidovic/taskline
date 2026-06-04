@@ -57,11 +57,14 @@ class AuditController extends Controller
 
         $logs = $query->latest()->paginate(50)->withQueryString();
 
-        // Workspace project list for the project filter dropdown.
+        // Workspace project list for the project filter dropdown. This prop
+        // shadows the shared sidebar `projects` prop, so it must carry `uuid`
+        // too — AppLayout builds `route('projects.show', p.uuid)` from it, and
+        // a missing uuid makes Ziggy throw and blanks the whole page.
         $projects = Project::where('workspace_id', $workspace->id)
             ->whereIn('id', $projectIds)
             ->orderBy('name')
-            ->get(['id', 'name', 'key', 'color']);
+            ->get(['id', 'uuid', 'name', 'key', 'color']);
 
         // Workspace member list for the person filter dropdown.
         $members = $workspace->users()
