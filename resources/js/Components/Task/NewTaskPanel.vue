@@ -404,6 +404,10 @@ function submit() {
   display: flex; flex-direction: column;
   animation: ntp-slideIn 180ms cubic-bezier(0.32, 0.72, 0, 1);
 }
+/* Full-width sheet on phones */
+@media (max-width: 768px) {
+  .side-panel { width: 100vw; max-width: 100vw; border-left: none; }
+}
 @keyframes ntp-fadeIn  { from { opacity: 0 } to { opacity: 1 } }
 @keyframes ntp-slideIn { from { transform: translateX(40px); opacity: 0 } to { transform: none; opacity: 1 } }
 

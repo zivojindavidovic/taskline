@@ -1287,4 +1287,35 @@ function deleteColumn(columnId) {
   background: var(--border);
   margin: 4px 0;
 }
+
+/* ── Responsive: tablet / small laptop (matches design) ── */
+@media (max-width: 1024px) {
+  .search-wrap { width: 200px; }
+}
+
+/* ── Responsive: phone ── */
+/* Mirrors the design's mobile header rhythm exactly: rows wrap with
+   12px/16px padding, search keeps its DOM position (name → search →
+   new task) and drops to a full-width line — no `order` override that
+   reshuffles it behind the New-task button. The sprint row keeps its
+   native sequence (sprint → meta → filters → spacer → board/list →
+   lock → complete); the flex:1 spacer alone pushes the toggle group,
+   with no extra margin or font overrides that diverge from the design. */
+@media (max-width: 768px) {
+  .topbar {
+    flex-wrap: wrap;
+    padding: var(--s-3) var(--s-4);
+    row-gap: var(--s-2);
+  }
+  .search-wrap {
+    flex: 1 1 100%;
+    width: auto;
+    max-width: none;
+  }
+  .sprint-header-row {
+    flex-wrap: wrap;
+    padding: var(--s-3) var(--s-4);
+    row-gap: var(--s-2);
+  }
+}
 </style>

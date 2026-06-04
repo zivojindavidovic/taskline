@@ -1588,6 +1588,10 @@ function copyLink() { copyText(window.location.href) }
   display: flex; flex-direction: column;
   animation: tp-slideIn 180ms cubic-bezier(0.32, 0.72, 0, 1);
 }
+/* Full-width sheet on phones */
+@media (max-width: 768px) {
+  .side-panel { width: 100vw; max-width: 100vw; border-left: none; }
+}
 @keyframes tp-fadeIn  { from { opacity: 0 } to { opacity: 1 } }
 @keyframes tp-slideIn { from { transform: translateX(40px); opacity: 0 } to { transform: none; opacity: 1 } }
 

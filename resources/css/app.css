@@ -501,3 +501,35 @@ input, textarea, select { font-family: inherit; color: var(--fg); }
 .complete-cta .btn.primary:hover:not(:disabled) {
   background: color-mix(in oklab, var(--status-done) 88%, black);
 }
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+/* Tablet */
+@media (max-width: 1024px) {
+  .dash { padding: 20px 24px; }
+}
+
+/* Phone */
+@media (max-width: 768px) {
+  /* Board stays a horizontal kanban, but each column ≈ one screen with a peek
+     of the next — the standard mobile board pattern (identical to the design). */
+  .board { padding: var(--s-4); gap: var(--s-3); }
+  .column,
+  .add-column { flex-basis: 80vw; width: 80vw; max-width: 300px; }
+
+  /* Dashboard: tighter padding for small screens */
+  .dash { padding: 16px; gap: 16px; }
+  .dash h1 { font-size: 20px; }
+
+  /* List rows: drop the fixed task-id column so titles get the room */
+  .task-row { gap: 8px; padding: 10px 12px; }
+  .task-row .id { display: none; }
+
+  /* Done-column CTA wraps instead of overflowing */
+  .complete-cta { flex-wrap: wrap; }
+  .complete-cta .btn.primary { width: 100%; justify-content: center; }
+}
+
+/* Small phone */
+@media (max-width: 460px) {
+  .stat-grid { grid-template-columns: 1fr; }
+}

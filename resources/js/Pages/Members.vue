@@ -235,4 +235,11 @@ function removeMember(member) {
 }
 .remove-btn:hover { background: #fee2e2; color: var(--status-blocked); }
 [data-theme="dark"] .remove-btn:hover { background: #7f1d1d33; }
+
+/* ── Responsive: phone ── */
+@media (max-width: 600px) {
+  /* Let the invite form stack instead of squeezing the email field */
+  .invite-card form { flex-wrap: wrap; }
+  .invite-card form .field-input.flex-1 { flex: 1 0 100%; }
+}
 </style>

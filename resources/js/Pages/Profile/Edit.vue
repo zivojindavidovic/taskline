@@ -873,4 +873,12 @@ function goBack() {
     transition: background 80ms, color 80ms;
 }
 .ghost-sm-btn:hover { background: var(--bg-hover); color: var(--fg); }
+
+/* ── Responsive: phone ── */
+@media (max-width: 768px) {
+    .profile-page { padding: 16px 16px 48px; }
+    .profile-grid { grid-template-columns: 1fr; }
+    .theme-grid { grid-template-columns: 1fr; }
+    .avatar-row { gap: 16px; }
+}
 </style>

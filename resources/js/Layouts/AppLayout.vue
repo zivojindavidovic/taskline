@@ -1,15 +1,22 @@
 <template>
   <div class="app-shell">
-    <!-- Sidebar -->
-    <aside class="sidebar">
+    <!-- Mobile drawer backdrop -->
+    <div v-if="mobileNavOpen" class="sidebar-backdrop" @click="mobileNavOpen = false" />
 
-      <!-- Workspace header -->
-      <div class="workspace-header" @click="showWorkspaceSwitcher = true">
+    <!-- Sidebar -->
+    <aside class="sidebar" :class="{ 'mobile-open': mobileNavOpen }">
+
+      <!-- Workspace header — the close × tucks into this row on mobile (matches
+           design); there is no separate close row. -->
+      <div class="workspace-header" @click="showWorkspaceSwitcher = true; mobileNavOpen = false">
         <div class="ws-logo" :style="{ background: workspace?.color ?? 'var(--accent)' }">
           {{ workspaceLetter }}
         </div>
         <span class="ws-name">{{ workspace?.name ?? 'My Workspace' }}</span>
         <ChevronIcon class="ws-chev" />
+        <button class="drawer-close" type="button" aria-label="Close menu" @click.stop="mobileNavOpen = false">
+          <CloseIcon style="width:16px;height:16px" />
+        </button>
       </div>
 
       <!-- Nav -->
@@ -31,12 +38,12 @@
         <!-- Projects -->
         <div class="nav-section-label">
           <span>Projects</span>
-          <button v-if="workspace && canManageWorkspace" class="section-add-btn" title="New project" @click="showNewProject = true">
+          <button v-if="workspace && canManageWorkspace" class="section-add-btn" title="New project" @click="showNewProject = true; mobileNavOpen = false">
             <PlusIcon style="width:13px;height:13px" />
           </button>
         </div>
 
-        <button v-if="!workspace" type="button" class="no-workspace-btn" @click="showWorkspaceSwitcher = true">
+        <button v-if="!workspace" type="button" class="no-workspace-btn" @click="showWorkspaceSwitcher = true; mobileNavOpen = false">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
@@ -58,7 +65,7 @@
         <NavItem :href="route('audit')" :active="isActive('audit')">
           <HistoryIcon class="nav-icon" /> Audit log
         </NavItem>
-        <button type="button" class="nav-btn" @click="showWorkspaceSettings = true">
+        <button type="button" class="nav-btn" @click="showWorkspaceSettings = true; mobileNavOpen = false">
           <SettingsIcon class="nav-icon" /> Settings
         </button>
 
@@ -80,6 +87,18 @@
 
     <!-- Main -->
     <main class="main-area">
+      <!-- Mobile top bar: always workspace icon + name (matches design); the
+           active tab title lives in .app-topbar below. Only shown ≤768px. -->
+      <div class="mobile-topbar">
+        <button class="hamburger-btn" type="button" aria-label="Open menu" @click="mobileNavOpen = true">
+          <MenuIcon style="width:18px;height:18px" />
+        </button>
+        <div class="ws-logo" :style="{ background: workspace?.color ?? 'var(--accent)' }">
+          {{ workspaceLetter }}
+        </div>
+        <span class="mobile-ws-name">{{ workspace?.name ?? 'Taskline' }}</span>
+      </div>
+
       <!-- Page topbar: shows the active view label (matches design) -->
       <header v-if="title || $slots.actions" class="app-topbar">
         <div class="crumbs">
@@ -111,6 +130,7 @@ import { useToast } from '@/composables/useToast'
 import {
   ChevronIcon, HomeIcon, InboxIcon, UserIcon,
   PlusIcon, HistoryIcon, SettingsIcon, LogoutIcon,
+  MenuIcon, CloseIcon,
 } from '@/Components/UI/Icons.vue'
 
 defineProps({
@@ -129,6 +149,12 @@ const { toast } = useToast()
 const showNewProject = ref(false)
 const showWorkspaceSwitcher = ref(false)
 const showWorkspaceSettings = ref(false)
+
+// Mobile off-canvas navigation. On ≤768px the sidebar slides in as a drawer;
+// a hamburger in the mobile top bar toggles it. Closed automatically whenever
+// an Inertia navigation starts (see onMounted below) so it never lingers.
+const mobileNavOpen = ref(false)
+let offMobileNav = null
 
 const workspaceLetter = computed(() =>
   workspace.value?.name?.[0]?.toUpperCase() ?? user.value?.name?.[0]?.toUpperCase() ?? 'W'
@@ -171,6 +197,9 @@ function logout() {
 // manual reload.
 let userChannelName = null
 onMounted(() => {
+  // Any page navigation (nav links, profile, logout) closes the mobile drawer.
+  offMobileNav = router.on('start', () => { mobileNavOpen.value = false })
+
   const uid = user.value?.id
   if (!uid || !window.Echo) return
 
@@ -196,6 +225,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (userChannelName && window.Echo) window.Echo.leave(userChannelName)
   userChannelName = null
+  offMobileNav?.()
 })
 </script>
 
@@ -381,4 +411,85 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 .crumb-current { color: var(--fg); font-weight: 500; }
+
+/* ── Mobile drawer + top bar (hidden on desktop) ──────────────────────── */
+.mobile-topbar,
+.sidebar-backdrop { display: none; }
+
+/* Drawer close × — only revealed on mobile (sits in the workspace header row) */
+.drawer-close { display: none; }
+
+@media (max-width: 768px) {
+  /* Sidebar slides in as an off-canvas drawer */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 45;
+    width: 264px; min-width: 264px;
+    transform: translateX(-100%);
+    transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 44;
+    animation: fade-in 120ms ease-out;
+  }
+
+  /* Close (×) tucked into the workspace header row — matches the design */
+  .drawer-close {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; flex-shrink: 0;
+    margin-left: 2px;
+    border: none; background: none; border-radius: var(--r-sm);
+    color: var(--fg-subtle); cursor: pointer;
+    transition: background 80ms, color 80ms;
+  }
+  .drawer-close:hover { background: var(--bg-hover); color: var(--fg); }
+
+  /* Mobile top bar with hamburger */
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 52px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-app);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    flex-shrink: 0;
+  }
+  .hamburger-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    border-radius: var(--r-md);
+    color: var(--fg);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 80ms;
+  }
+  .hamburger-btn:hover { background: var(--bg-hover); }
+  .mobile-topbar .ws-logo { width: 22px; height: 22px; font-size: 11px; }
+  .mobile-ws-name {
+    flex: 1; min-width: 0;
+    font-size: 14px; font-weight: 600; color: var(--fg);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* When AppLayout renders its own page topbar, drop it below the hamburger bar */
+  .app-topbar {
+    position: static;
+    padding: 10px 16px;
+  }
+}
 </style>
