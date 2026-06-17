@@ -17,7 +17,7 @@ class BoardColumnUpdated implements ShouldBroadcastNow
     public function __construct(
         public Project $project,
         public BoardColumn $column,
-        public string $event, // 'created' | 'updated' | 'deleted'
+        public string $event, // 'created' | 'updated' | 'deleted' | 'reordered'
     ) {}
 
     public function broadcastOn(): array

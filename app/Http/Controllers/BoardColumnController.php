@@ -8,6 +8,8 @@ use App\Models\BoardColumn;
 use App\Models\Project;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class BoardColumnController extends Controller
 {
@@ -35,6 +37,61 @@ class BoardColumnController extends Controller
         broadcast(new BoardColumnUpdated($project, $column, 'created'))->toOthers();
 
         return back()->with('success', "Column \"{$data['name']}\" added.");
+    }
+
+    /**
+     * Persist a new left-to-right column order for a project's board.
+     *
+     * The client sends the full ordered list of column UUIDs (`order`); the
+     * server rewrites each column's `position` to match its index. The same
+     * endpoint backs both drag-to-reorder and the "Move left / Move right"
+     * menu actions — the frontend just computes the resulting order and posts
+     * the whole array, which keeps the operation atomic and idempotent.
+     */
+    public function reorder(Request $request, Project $project): RedirectResponse
+    {
+        $validated = $request->validate([
+            'order'   => ['required', 'array', 'min:1'],
+            'order.*' => ['string'],
+        ]);
+
+        $columns = $project->boardColumns()->get();
+        $byUuid  = $columns->keyBy('uuid');
+        $order   = collect($validated['order']);
+
+        // The submitted order must reference every column in this project
+        // exactly once — no duplicates, no missing columns, and nothing from
+        // another board. This prevents position corruption and cross-project
+        // tampering through the {project} the request was scoped to.
+        $isComplete = $order->count() === $columns->count()
+            && $order->unique()->count() === $order->count()
+            && $order->every(fn ($uuid) => $byUuid->has($uuid));
+
+        if (! $isComplete) {
+            throw ValidationException::withMessages([
+                'order' => 'The order must list every column in this project exactly once.',
+            ]);
+        }
+
+        DB::transaction(function () use ($order, $byUuid) {
+            $order->each(function ($uuid, $index) use ($byUuid) {
+                $column = $byUuid->get($uuid);
+                if ((int) $column->position !== $index) {
+                    $column->update(['position' => $index]);
+                }
+            });
+        });
+
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'project_id' => $project->id,
+            'action'     => 'column.reordered',
+            'meta'       => ['order' => $order->all()],
+        ]);
+
+        broadcast(new BoardColumnUpdated($project, $byUuid->get($order->first())->refresh(), 'reordered'))->toOthers();
+
+        return back();
     }
 
     public function update(Request $request, BoardColumn $column): RedirectResponse

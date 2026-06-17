@@ -1,12 +1,15 @@
 <template>
   <div class="board">
     <BoardColumn
-      v-for="col in columns"
+      v-for="(col, i) in columns"
       :key="col.id"
       :column="col"
+      :index="i"
+      :count="columns.length"
       :tasks="tasksByColumn[col.id] ?? []"
       :locked="locked"
       :draggingId="draggingId"
+      :colDragId="colDragId"
       @addTask="$emit('addTask', $event)"
       @openTask="$emit('openTask', $event)"
       @dragStart="draggingId = $event"
@@ -14,6 +17,11 @@
       @drop="onDrop"
       @rename="(id, name) => $emit('renameColumn', id, name)"
       @delete="$emit('deleteColumn', $event)"
+      @recolor="(id, color) => $emit('recolorColumn', id, color)"
+      @move="moveColumn"
+      @colDragStart="colDragId = $event"
+      @colDragEnd="colDragId = null"
+      @colDrop="onColDrop"
     />
 
     <!-- Add column -->
@@ -54,7 +62,7 @@ const props = defineProps({
   tasks:    { type: Array,  required: true },
   locked:   { type: Boolean, default: false },
 })
-const emit = defineEmits(['addTask', 'openTask', 'moveTask', 'addColumn', 'renameColumn', 'deleteColumn'])
+const emit = defineEmits(['addTask', 'openTask', 'moveTask', 'addColumn', 'renameColumn', 'deleteColumn', 'recolorColumn', 'reorderColumns'])
 
 // Group tasks by column
 const tasksByColumn = computed(() => {
@@ -68,7 +76,7 @@ const tasksByColumn = computed(() => {
   return m
 })
 
-// Drag state
+// Task drag state
 const draggingId = ref(null)
 
 function onDrop(colId) {
@@ -76,6 +84,37 @@ function onDrop(colId) {
     emit('moveTask', draggingId.value, colId)
   }
   draggingId.value = null
+}
+
+// ── Column reorder ─────────────────────────────────────────────────────────
+// Both the menu actions (Move left/right) and drag-to-reorder resolve to a
+// single new ordering of column ids, which is emitted upward in one shot.
+const colDragId = ref(null)
+
+const currentOrder = () => props.columns.map(c => c.id)
+
+function moveColumn(id, dir) {
+  const ids = currentOrder()
+  const i = ids.indexOf(id)
+  const j = i + dir
+  if (i < 0 || j < 0 || j >= ids.length) return
+  ;[ids[i], ids[j]] = [ids[j], ids[i]]
+  emit('reorderColumns', ids)
+}
+
+function reorderColumns(fromId, toId) {
+  if (fromId === toId) return
+  const ids = currentOrder()
+  const from = ids.indexOf(fromId)
+  const to   = ids.indexOf(toId)
+  if (from < 0 || to < 0) return
+  ids.splice(to, 0, ids.splice(from, 1)[0])
+  emit('reorderColumns', ids)
+}
+
+function onColDrop(targetId) {
+  if (colDragId.value != null) reorderColumns(colDragId.value, targetId)
+  colDragId.value = null
 }
 
 // Add column

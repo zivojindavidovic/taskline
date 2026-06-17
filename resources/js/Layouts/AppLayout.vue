@@ -50,10 +50,26 @@
           Create a workspace first
         </button>
 
-        <NavItem v-for="p in projects" :key="p.id" :href="route('projects.show', p.uuid)" :active="isProjectActive(p.uuid)">
-          <span class="project-dot" :style="{ background: p.color }" />
-          <span class="truncate">{{ p.name }}</span>
-        </NavItem>
+        <div
+          v-for="p in projects"
+          :key="p.id"
+          class="project-row"
+          :class="{ active: isProjectActive(p.uuid) }"
+        >
+          <Link :href="route('projects.show', p.uuid)" class="project-link">
+            <span class="project-dot" :style="{ background: p.color }" />
+            <span class="truncate">{{ p.name }}</span>
+          </Link>
+          <Link
+            :href="route('projects.settings', p.uuid)"
+            class="project-settings-btn"
+            :class="{ visible: isProjectSettingsActive(p.uuid) }"
+            title="Project settings"
+            aria-label="Project settings"
+          >
+            <SettingsIcon style="width:14px;height:14px" />
+          </Link>
+        </div>
 
         <!-- Workspace section -->
         <div class="nav-section-label" style="margin-top:8px">
@@ -119,7 +135,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { usePage, router } from '@inertiajs/vue3'
+import { usePage, router, Link } from '@inertiajs/vue3'
 import NavItem from '@/Components/UI/NavItem.vue'
 import Avatar from '@/Components/UI/Avatar.vue'
 import ToastContainer from '@/Components/UI/ToastContainer.vue'
@@ -167,7 +183,11 @@ watch(() => page.props.flash, (flash) => {
 
 function isActive(name) { return route().current(name) }
 function isProjectActive(id) {
-  return route().current('projects.show') && route().params?.project == id
+  return (route().current('projects.show') || route().current('projects.settings'))
+    && route().params?.project == id
+}
+function isProjectSettingsActive(id) {
+  return route().current('projects.settings') && route().params?.project == id
 }
 
 const inboxCount = computed(() => page.props.inbox_count ?? 0)
@@ -308,6 +328,37 @@ onBeforeUnmount(() => {
   border-radius: 2px;
   display: inline-block; flex-shrink: 0;
 }
+
+/* Project row = project link + reveal-on-hover settings gear */
+.project-row {
+  display: flex; align-items: center;
+  border-radius: var(--r-sm);
+  transition: background 80ms;
+}
+.project-row:hover { background: var(--bg-hover); }
+.project-row.active { background: var(--bg-active); }
+.project-link {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 var(--s-2); height: var(--row-h, 32px);
+  font-size: var(--fs-13); font-family: var(--font-ui); font-weight: 400;
+  color: var(--fg-muted); text-decoration: none;
+  white-space: nowrap; overflow: hidden;
+}
+.project-row:hover .project-link,
+.project-row.active .project-link { color: var(--fg); }
+.project-row.active .project-link { font-weight: 500; }
+.project-settings-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; margin-right: 4px; flex-shrink: 0;
+  border-radius: var(--r-sm); border: none; background: none;
+  color: var(--fg-subtle); cursor: pointer; text-decoration: none;
+  opacity: 0;
+  transition: opacity 80ms, background 80ms, color 80ms;
+}
+.project-row:hover .project-settings-btn,
+.project-settings-btn.visible { opacity: 1; }
+.project-settings-btn:hover { background: var(--bg-active); color: var(--fg); }
 
 .nav-icon {
   width: 16px; height: 16px;
@@ -491,5 +542,8 @@ onBeforeUnmount(() => {
     position: static;
     padding: 10px 16px;
   }
+
+  /* No hover on touch — keep the project settings gear permanently visible */
+  .project-settings-btn { opacity: 1; }
 }
 </style>

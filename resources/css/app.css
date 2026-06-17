@@ -186,6 +186,45 @@ input, textarea, select { font-family: inherit; color: var(--fg); }
   border-bottom: 1px solid var(--border);
 }
 .column-header .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* Clickable column color dot → opens the recolor swatch grid */
+.dot-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  margin: -2px;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.dot-btn:hover { background: var(--bg-hover); }
+
+/* Color picker grid (column dot recolor) */
+.menu-label { font-size: var(--fs-12); color: var(--fg-subtle); padding: 6px 8px 2px; font-weight: 500; }
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  padding: 6px 8px 8px;
+}
+.color-grid .swatch {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.color-grid .swatch:hover { transform: scale(1.12); }
+.color-grid .swatch.active {
+  box-shadow: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent);
+}
+/* Wider variant for the project settings color picker */
+.color-grid.wide { grid-template-columns: repeat(10, 1fr); max-width: 460px; }
 .column-header .name { font-weight: 600; font-size: var(--fs-13); flex: 1; }
 .column-header .name input {
   background: transparent; border: 1px solid transparent; border-radius: var(--r-sm);
@@ -206,6 +245,17 @@ input, textarea, select { font-family: inherit; color: var(--fg); }
 .column-body.drag-over {
   background: var(--accent-soft);
   border-radius: var(--r-md);
+}
+
+/* Column drag-to-reorder */
+.column-header.col-grab { cursor: grab; }
+.column-header.col-grab:active { cursor: grabbing; }
+.column.col-dragging {
+  opacity: 0.5;
+}
+.column.col-drop-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
 }
 
 .column-empty {
@@ -361,6 +411,8 @@ input, textarea, select { font-family: inherit; color: var(--fg); }
 .btn.secondary:hover:not(:disabled) { background: var(--bg-hover); }
 .btn.ghost { color: var(--fg-muted); }
 .btn.ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--fg); }
+.btn.danger { background: var(--status-blocked); color: #fff; }
+.btn.danger:hover:not(:disabled) { filter: brightness(1.05); }
 .btn.sm { height: 24px; padding: 0 var(--s-2); font-size: var(--fs-12); }
 .btn.icon-only { padding: 0; width: 28px; justify-content: center; }
 .btn.icon-only.sm { width: 24px; }

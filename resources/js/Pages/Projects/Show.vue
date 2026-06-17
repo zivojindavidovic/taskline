@@ -249,6 +249,8 @@
         @addColumn="addColumn"
         @renameColumn="renameColumn"
         @deleteColumn="deleteColumn"
+        @recolorColumn="recolorColumn"
+        @reorderColumns="reorderColumns"
       />
     </div>
 
@@ -961,8 +963,28 @@ function renameColumn(columnId, name) {
   router.patch(route('columns.update', findColumnUuid(columnId)), { name }, { preserveScroll: true })
 }
 
+function recolorColumn(columnId, color) {
+  router.patch(route('columns.update', findColumnUuid(columnId)), { color }, {
+    preserveScroll: true,
+    preserveState: true,
+    only: ['columns'],
+  })
+}
+
 function deleteColumn(columnId) {
   router.delete(route('columns.destroy', findColumnUuid(columnId)), { preserveScroll: true })
+}
+
+// Persist a new left-to-right column order. `orderedIds` are internal integer
+// ids; the backend addresses columns by uuid, so map them before sending the
+// full ordered list. Inertia reloads `columns` (ordered by position) on success.
+function reorderColumns(orderedIds) {
+  const order = orderedIds.map(id => findColumnUuid(id))
+  router.patch(route('columns.reorder', props.project.uuid), { order }, {
+    preserveScroll: true,
+    preserveState: true,
+    only: ['columns'],
+  })
 }
 </script>
 

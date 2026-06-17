@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\MemberProjectAccessUpdated;
 use App\Events\ProjectCreated;
+use App\Events\ProjectUpdated;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -140,6 +141,146 @@ class ProjectController extends Controller
 
         return redirect()->route('projects.show', $project)
             ->with('success', "Project \"{$project->name}\" created.");
+    }
+
+    /**
+     * Renders the per-project settings page (reached from the sidebar gear):
+     * general (name/color), members, and the danger zone (delete). Any project
+     * member may view it; mutating actions are gated server-side.
+     */
+    public function settings(Project $project): Response
+    {
+        $user = auth()->user();
+        abort_unless(
+            $project->owner_id === $user->id ||
+            $project->members()->where('users.id', $user->id)->exists(),
+            403
+        );
+
+        $members = $project->members()
+            ->get()
+            ->map(fn ($m) => [
+                'id'           => $m->id,
+                'name'         => $m->name,
+                'email'        => $m->email,
+                'avatar_color' => $m->avatar_color,
+                'role'         => $m->pivot->role,
+            ]);
+
+        // The owner always appears first with the immutable 'owner' role.
+        $owner = $project->owner;
+        if (!$members->contains('id', $owner->id)) {
+            $members = collect([[
+                'id'           => $owner->id,
+                'name'         => $owner->name,
+                'email'        => $owner->email,
+                'avatar_color' => $owner->avatar_color,
+                'role'         => 'owner',
+            ]])->concat($members);
+        } else {
+            $members = $members->map(fn ($m) => $m['id'] === $owner->id
+                ? array_merge($m, ['role' => 'owner'])
+                : $m);
+        }
+
+        // Workspace people not yet on the project — candidates for "Add member".
+        $memberIds = $members->pluck('id')->all();
+        $available = $project->workspace->users()
+            ->whereNotIn('users.id', $memberIds)
+            ->get(['users.id', 'users.name', 'users.email', 'users.avatar_color'])
+            ->map(fn ($u) => $u->only(['id', 'name', 'email', 'avatar_color']));
+
+        return Inertia::render('Projects/Settings', [
+            'project'      => $project->only(['id', 'uuid', 'name', 'key', 'color']),
+            'members'      => $members->values(),
+            'available'    => $available->values(),
+            'isOwner'      => $project->owner_id === $user->id,
+            'canManage'    => $this->canManage($project),
+            'projectCount' => $project->workspace->projects()->count(),
+        ]);
+    }
+
+    /**
+     * Rename and/or recolor a project. Managing a project is reserved for its
+     * owner and for workspace owners/admins — the same people who can create one.
+     */
+    public function update(Request $request, Project $project): RedirectResponse
+    {
+        abort_unless($this->canManage($project), 403);
+
+        $workspaceId = $project->workspace_id;
+
+        $data = $request->validate([
+            'name'  => [
+                'sometimes', 'required', 'string', 'max:100',
+                Rule::unique('projects', 'name')
+                    ->where(fn ($q) => $q->where('workspace_id', $workspaceId))
+                    ->ignore($project->id),
+            ],
+            'color' => ['sometimes', 'required', 'string', 'max:7'],
+        ], [
+            'name.unique' => 'A project with this name already exists in this workspace.',
+        ]);
+
+        $previousName = $project->name;
+        $project->update($data);
+
+        if (array_key_exists('name', $data) && $data['name'] !== $previousName) {
+            \App\Models\AuditLog::create([
+                'user_id'    => auth()->id(),
+                'project_id' => $project->id,
+                'action'     => 'project.renamed',
+                'meta'       => ['from' => $previousName, 'to' => $project->name],
+            ]);
+        }
+
+        broadcast(new ProjectUpdated($project->refresh()))->toOthers();
+
+        return back()->with('success', 'Project updated.');
+    }
+
+    /**
+     * Permanently delete a project (cascades to its tasks, sprints, columns and
+     * member rows via FK constraints). Refuses to remove a workspace's last
+     * project so the user is never left with an empty sidebar.
+     */
+    public function destroy(Project $project): RedirectResponse
+    {
+        abort_unless($this->canManage($project), 403);
+
+        if ($project->workspace->projects()->count() <= 1) {
+            return back()->withErrors([
+                'project' => 'You can’t delete the last project in a workspace.',
+            ]);
+        }
+
+        $name = $project->name;
+
+        // Record the deletion against the workspace, not the project (its
+        // project_id would be nulled by the cascade the moment it's gone).
+        \App\Models\AuditLog::create([
+            'user_id'    => auth()->id(),
+            'project_id' => null,
+            'action'     => 'project.deleted',
+            'meta'       => ['name' => $name],
+        ]);
+
+        $project->delete();
+
+        return redirect()->route('dashboard')
+            ->with('success', "Project \"{$name}\" deleted.");
+    }
+
+    /**
+     * Whether the current user may manage (rename / recolor / delete) a project:
+     * its owner, or a workspace owner/admin.
+     */
+    private function canManage(Project $project): bool
+    {
+        $user = auth()->user();
+
+        return $project->owner_id === $user->id
+            || (bool) $project->workspace?->canManage($user);
     }
 
     public function show(Request $request, Project $project): Response

@@ -50,6 +50,9 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     // Projects
     Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+    Route::get('/projects/{project}/settings', [ProjectController::class, 'settings'])->name('projects.settings');
+    Route::patch('/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
+    Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
 
     // Filters
     Route::get('/projects/{project}/filters', [FilterController::class, 'show'])->name('projects.filters.show');
@@ -95,6 +98,7 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
 
     // Board columns
     Route::post('/projects/{project}/columns', [BoardColumnController::class, 'store'])->name('columns.store');
+    Route::patch('/projects/{project}/columns/reorder', [BoardColumnController::class, 'reorder'])->name('columns.reorder');
     Route::patch('/columns/{column}', [BoardColumnController::class, 'update'])->name('columns.update');
     Route::delete('/columns/{column}', [BoardColumnController::class, 'destroy'])->name('columns.destroy');
 
