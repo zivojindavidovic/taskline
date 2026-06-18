@@ -50,4 +50,23 @@ class Project extends Model
     {
         return $this->hasMany(AuditLog::class);
     }
+
+    /**
+     * IDs of every project in a workspace the given user can still access (owns
+     * or is a member of). Drives the realtime sidebar refresh that follows any
+     * access change — invite, removal, or project deletion.
+     *
+     * @return array<int, int>
+     */
+    public static function accessibleIdsFor(int $userId, int $workspaceId): array
+    {
+        return static::query()
+            ->where('workspace_id', $workspaceId)
+            ->where(function ($q) use ($userId) {
+                $q->where('owner_id', $userId)
+                  ->orWhereHas('members', fn ($q2) => $q2->where('users.id', $userId));
+            })
+            ->pluck('id')
+            ->all();
+    }
 }

@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MemberProjectAccessUpdated;
 use App\Events\ProjectMembersChanged;
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -82,6 +85,14 @@ class MembersController extends Controller
 
         broadcast(new ProjectMembersChanged($project->id, 'member_invited', $invitee->id))->toOthers();
 
+        // Push the new access to the invitee's own channel so their sidebar
+        // picks up the project live (AppLayout reloads on this event).
+        broadcast(new MemberProjectAccessUpdated(
+            (int) $project->workspace_id,
+            (int) $invitee->id,
+            Project::accessibleIdsFor((int) $invitee->id, (int) $project->workspace_id),
+        ))->toOthers();
+
         return back()->with('success', "{$invitee->name} has been added to the project.");
     }
 
@@ -106,6 +117,20 @@ class MembersController extends Controller
 
         $project->members()->detach($member->id);
 
+        // Losing project access also strips the member from every task in the
+        // project they were assigned to — both the legacy single-assignee column
+        // and the multi-assignee pivot — so no stale assignment survives.
+        $taskIds = $project->tasks()->pluck('id');
+        if ($taskIds->isNotEmpty()) {
+            Task::whereIn('id', $taskIds)
+                ->where('assignee_id', $member->id)
+                ->update(['assignee_id' => null]);
+            DB::table('task_assignees')
+                ->whereIn('task_id', $taskIds)
+                ->where('user_id', $member->id)
+                ->delete();
+        }
+
         \App\Models\AuditLog::create([
             'user_id'    => auth()->id(),
             'project_id' => $project->id,
@@ -114,6 +139,13 @@ class MembersController extends Controller
         ]);
 
         broadcast(new ProjectMembersChanged($project->id, 'member_removed', $member->id))->toOthers();
+
+        // Tell the removed user directly so their sidebar drops the project live.
+        broadcast(new MemberProjectAccessUpdated(
+            (int) $project->workspace_id,
+            (int) $member->id,
+            Project::accessibleIdsFor((int) $member->id, (int) $project->workspace_id),
+        ))->toOthers();
 
         return back()->with('success', "{$member->name} has been removed from the project.");
     }

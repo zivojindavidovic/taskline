@@ -627,6 +627,11 @@ onMounted(() => {
     .listen('SprintUpdated', () => {
       router.reload({ only: ['sprints', 'currentSprint', 'tasks'], preserveScroll: true, preserveState: true })
     })
+    // The project itself was renamed or recolored elsewhere — refresh the
+    // header + project switcher so everyone on the board sees it live.
+    .listen('ProjectUpdated', () => {
+      router.reload({ only: ['project', 'allProjects'], preserveScroll: true, preserveState: true })
+    })
 })
 onUnmounted(() => window.Echo.leave(`project.${props.project.id}`))
 

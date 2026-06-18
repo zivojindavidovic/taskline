@@ -254,7 +254,17 @@ class ProjectController extends Controller
             ]);
         }
 
-        $name = $project->name;
+        $name        = $project->name;
+        $workspaceId = (int) $project->workspace_id;
+
+        // Everyone who could see this project — its members plus the owner —
+        // needs their sidebar refreshed once it's gone. Capture them before the
+        // delete cascades the membership rows away.
+        $affectedUserIds = $project->members()->pluck('users.id')
+            ->push($project->owner_id)
+            ->unique()
+            ->values()
+            ->all();
 
         // Record the deletion against the workspace, not the project (its
         // project_id would be nulled by the cascade the moment it's gone).
@@ -266,6 +276,16 @@ class ProjectController extends Controller
         ]);
 
         $project->delete();
+
+        // Broadcast the new access set to each affected user so their sidebar
+        // drops the deleted project live.
+        foreach ($affectedUserIds as $userId) {
+            broadcast(new MemberProjectAccessUpdated(
+                $workspaceId,
+                (int) $userId,
+                Project::accessibleIdsFor((int) $userId, $workspaceId),
+            ))->toOthers();
+        }
 
         return redirect()->route('dashboard')
             ->with('success', "Project \"{$name}\" deleted.");
