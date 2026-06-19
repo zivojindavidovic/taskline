@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\FilterService;
+use App\Services\TagService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,7 +18,10 @@ use Inertia\Response;
 
 class ProjectController extends Controller
 {
-    public function __construct(private FilterService $filterService) {}
+    public function __construct(
+        private FilterService $filterService,
+        private TagService $tagService,
+    ) {}
 
     public function store(Request $request): RedirectResponse
     {
@@ -365,6 +369,8 @@ class ProjectController extends Controller
 
         $taskQuery = $project->tasks()
             ->whereNull('parent_task_id')
+            ->orderBy('position')
+            ->orderBy('id')
             ->with([
                 'assignee:id,name,email,avatar_color',
                 'assignees:id,name,email,avatar_color',
@@ -426,6 +432,7 @@ class ProjectController extends Controller
             'tasks'         => $tasks,
             'allUsers'      => $allUsers,
             'allProjects'   => $allProjects,
+            'allTags'       => $this->tagService->allForWorkspace($project->workspace_id),
             'savedFilters'  => $savedFilters,
         ]);
     }

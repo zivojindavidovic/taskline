@@ -279,6 +279,7 @@ const props = defineProps({
   columns:       { type: Array,   default: () => [] },
   defaultColumn: { type: Number,  default: null },
   allUsers:      { type: Array,   default: () => [] },
+  allTags:       { type: Array,   default: () => [] },
 })
 const emit = defineEmits(['close'])
 
@@ -324,7 +325,7 @@ const selectedColumn = computed(() => props.columns.find(c => c.id === form.boar
 const selectedUser   = computed(() => props.allUsers.find(u => u.id === form.assignee_id))
 const selectedSprint = computed(() => props.sprints.find(s => s.id === form.sprint_id))
 
-const allTagOptions = computed(() => [...new Set([...ALL_TAGS, ...form.tags])])
+const allTagOptions = computed(() => [...new Set([...ALL_TAGS, ...props.allTags, ...form.tags])])
 const filteredTagOptions = computed(() => {
   const q = tagSearch.value.trim().toLowerCase()
   if (!q) return allTagOptions.value

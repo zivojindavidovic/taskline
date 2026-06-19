@@ -19,6 +19,8 @@
       @delete="$emit('deleteColumn', $event)"
       @recolor="(id, color) => $emit('recolorColumn', id, color)"
       @move="moveColumn"
+      @card-drop="onCardDrop"
+      @card-move="onCardMove"
       @colDragStart="colDragId = $event"
       @colDragEnd="colDragId = null"
       @colDrop="onColDrop"
@@ -62,9 +64,9 @@ const props = defineProps({
   tasks:    { type: Array,  required: true },
   locked:   { type: Boolean, default: false },
 })
-const emit = defineEmits(['addTask', 'openTask', 'moveTask', 'addColumn', 'renameColumn', 'deleteColumn', 'recolorColumn', 'reorderColumns'])
+const emit = defineEmits(['addTask', 'openTask', 'moveTask', 'reorderTasks', 'addColumn', 'renameColumn', 'deleteColumn', 'recolorColumn', 'reorderColumns'])
 
-// Group tasks by column
+// Group tasks by column, each column ordered top-to-bottom by persisted position.
 const tasksByColumn = computed(() => {
   const m = {}
   props.columns.forEach(c => { m[c.id] = [] })
@@ -73,6 +75,9 @@ const tasksByColumn = computed(() => {
       m[t.board_column_id].push(t)
     }
   })
+  Object.values(m).forEach(list =>
+    list.sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || (a.id - b.id))
+  )
   return m
 })
 
@@ -84,6 +89,40 @@ function onDrop(colId) {
     emit('moveTask', draggingId.value, colId)
   }
   draggingId.value = null
+}
+
+// ── Card reorder ───────────────────────────────────────────────────────────
+// Both a drop onto a sibling card and the "Move up / Move down" menu resolve to
+// one new ordering of a single column's task ids, emitted upward in one shot —
+// the vertical twin of the column reorder above. A card dropped from another
+// column is folded into the destination column's order here.
+function onCardDrop(targetTaskId, place) {
+  const dragId = draggingId.value
+  draggingId.value = null
+  if (dragId == null || dragId === targetTaskId) return
+
+  const target = props.tasks.find(t => t.id === targetTaskId)
+  if (!target) return
+  const colId = target.board_column_id
+
+  const ids = (tasksByColumn.value[colId] ?? []).map(t => t.id).filter(id => id !== dragId)
+  const idx = ids.indexOf(targetTaskId)
+  if (idx < 0) return
+  ids.splice(place === 'after' ? idx + 1 : idx, 0, dragId)
+  emit('reorderTasks', colId, ids)
+}
+
+function onCardMove(taskId, dir) {
+  const task = props.tasks.find(t => t.id === taskId)
+  if (!task) return
+  const colId = task.board_column_id
+
+  const ids = (tasksByColumn.value[colId] ?? []).map(t => t.id)
+  const i = ids.indexOf(taskId)
+  const j = i + dir
+  if (i < 0 || j < 0 || j >= ids.length) return
+  ;[ids[i], ids[j]] = [ids[j], ids[i]]
+  emit('reorderTasks', colId, ids)
 }
 
 // ── Column reorder ─────────────────────────────────────────────────────────

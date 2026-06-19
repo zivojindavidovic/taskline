@@ -1,11 +1,33 @@
 <template>
   <div
-    :class="['card', dragging ? 'dragging' : '', task.completed ? 'completed' : '']"
-    draggable="true"
+    :class="['card', dragging ? 'dragging' : '', task.completed ? 'completed' : '', dropEdge === 'before' ? 'drop-before' : '', dropEdge === 'after' ? 'drop-after' : '']"
+    :draggable="!locked"
     @dragstart="onDragStart"
-    @dragend="$emit('dragEnd')"
+    @dragend="onDragEnd"
+    @dragover="onDragOver"
+    @dragleave="onDragLeave"
+    @drop="onDrop"
     @click.stop="$emit('open', task.id)"
   >
+    <!-- Reorder menu (hover-revealed) -->
+    <div v-if="!locked" class="card-menu" @click.stop>
+      <DropdownMenu align="right" :width="150">
+        <template #trigger>
+          <button type="button" class="btn ghost icon-only sm card-menu-btn" title="Reorder task" aria-label="Reorder task">
+            <MoreIcon class="w-4 h-4" />
+          </button>
+        </template>
+        <div class="py-1">
+          <MenuItem :disabled="index === 0" @click="index > 0 && $emit('move', task.id, -1)">
+            <ArrowUpIcon class="w-3.5 h-3.5" /> Move up
+          </MenuItem>
+          <MenuItem :disabled="index === count - 1" @click="index < count - 1 && $emit('move', task.id, 1)">
+            <ArrowDownIcon class="w-3.5 h-3.5" /> Move down
+          </MenuItem>
+        </div>
+      </DropdownMenu>
+    </div>
+
     <!-- ID row -->
     <div class="card-id-row">
       <span>{{ task.key }}</span>
@@ -48,21 +70,57 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import Avatar from '@/Components/UI/Avatar.vue'
 import PriorityBadge from '@/Components/UI/PriorityBadge.vue'
-import { CalendarIcon, CommentIcon } from '@/Components/UI/Icons.vue'
+import DropdownMenu from '@/Components/UI/DropdownMenu.vue'
+import MenuItem from '@/Components/UI/MenuItem.vue'
+import { CalendarIcon, CommentIcon, MoreIcon, ArrowUpIcon, ArrowDownIcon } from '@/Components/UI/Icons.vue'
 import { formatDueDate } from '@/utils/dueDate'
 
 const props = defineProps({
   task:     { type: Object, required: true },
   dragging: { type: Boolean, default: false },
+  locked:   { type: Boolean, default: false },
+  index:    { type: Number, default: 0 },
+  count:    { type: Number, default: 1 },
 })
-const emit = defineEmits(['open', 'dragStart', 'dragEnd'])
+const emit = defineEmits(['open', 'dragStart', 'dragEnd', 'card-drop', 'move'])
+
+// Which edge the hovering card would drop against — drives the accent line.
+const dropEdge = ref(null)
 
 function onDragStart(e) {
+  if (props.locked) { e.preventDefault(); return }
   e.dataTransfer.effectAllowed = 'move'
   emit('dragStart', props.task.id)
+}
+
+function onDragEnd() {
+  dropEdge.value = null
+  emit('dragEnd')
+}
+
+function onDragOver(e) {
+  // Don't treat the card being dragged as its own drop target.
+  if (props.locked || props.dragging) return
+  e.preventDefault()
+  e.stopPropagation()
+  const r = e.currentTarget.getBoundingClientRect()
+  dropEdge.value = e.clientY - r.top < r.height / 2 ? 'before' : 'after'
+}
+
+function onDragLeave(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) dropEdge.value = null
+}
+
+function onDrop(e) {
+  if (props.locked || props.dragging) return
+  e.preventDefault()
+  e.stopPropagation() // beat the column-body drop, which would just append
+  const place = dropEdge.value || 'before'
+  dropEdge.value = null
+  emit('card-drop', props.task.id, place)
 }
 
 const subtasksDone = computed(() => props.task.subtasks?.filter(s => s.completed).length ?? 0)
@@ -70,7 +128,6 @@ const subtasksDone = computed(() => props.task.subtasks?.filter(s => s.completed
 const dueInfo = computed(() =>
   formatDueDate(props.task.due_date, props.task.start_date, props.task.completed)
 )
-
 </script>
 
 <style scoped>

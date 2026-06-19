@@ -50,6 +50,20 @@ class TaskService
             }
         }
 
+        // When a task lands in a different column (drag onto a column body, the
+        // column picker, or as part of a project move) drop it at the bottom of
+        // that column. Without this it would keep a stale index from its old
+        // column and sort into the wrong slot. An explicit position in the
+        // payload (the reorder endpoint) always wins.
+        if (array_key_exists('board_column_id', $data)
+            && (int) $data['board_column_id'] !== (int) $task->board_column_id
+            && !array_key_exists('position', $data)) {
+            $max = Task::where('board_column_id', $data['board_column_id'])
+                ->whereNull('parent_task_id')
+                ->max('position');
+            $data['position'] = $max === null ? 0 : ((int) $max) + 1;
+        }
+
         $action = $this->resolveAuditAction($task, $data, $assigneeIds, $isBacklogMove);
         $meta   = $this->resolveAuditMeta($task, $data, $assigneeIds, $previousProjectId, $isBacklogMove);
 

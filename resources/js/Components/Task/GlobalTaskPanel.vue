@@ -16,6 +16,7 @@
     :allUsers="allUsers"
     :allProjects="allProjects"
     :allSprints="sprints"
+    :allTags="allTags"
     :project="project"
     :locked="locked"
     @close="close"
@@ -64,6 +65,7 @@ const columns     = ref([])
 const allUsers    = ref([])
 const allProjects = ref([])
 const sprints     = ref([])
+const allTags     = ref([])
 const project     = ref(null)
 const locked      = ref(false)
 const noAccess    = ref(null)
@@ -82,6 +84,7 @@ async function load(id) {
     allUsers.value    = data.allUsers
     allProjects.value = data.allProjects
     sprints.value     = data.sprints
+    allTags.value     = data.allTags ?? []
     project.value     = data.project
     locked.value      = data.locked
   } catch (e) {

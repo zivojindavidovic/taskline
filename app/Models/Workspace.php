@@ -33,6 +33,11 @@ class Workspace extends Model
         return $this->hasMany(WorkspaceInvitation::class);
     }
 
+    public function tags(): HasMany
+    {
+        return $this->hasMany(Tag::class);
+    }
+
     /**
      * The user's role in this workspace: 'owner' for the workspace owner,
      * otherwise the workspace_users pivot role ('admin' / 'member'), or null

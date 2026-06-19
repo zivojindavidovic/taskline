@@ -16,6 +16,7 @@ class Task extends Model
     protected $fillable = [
         'key', 'title', 'description',
         'project_id', 'sprint_id', 'board_column_id',
+        'position',
         'parent_task_id',
         'assignee_id', 'created_by',
         'priority', 'tags',
@@ -25,6 +26,7 @@ class Task extends Model
 
     protected $casts = [
         'tags'         => 'array',
+        'position'     => 'integer',
         'completed'    => 'boolean',
         'completed_at' => 'datetime',
         'start_date'   => 'date',

@@ -1048,6 +1048,7 @@ const props = defineProps({
   allUsers:    { type: Array,   default: () => [] },
   allProjects: { type: Array,   default: () => [] },
   allSprints:  { type: Array,   default: () => [] },
+  allTags:     { type: Array,   default: () => [] },
   project:     { type: Object,  default: null },
   locked:      { type: Boolean, default: false },
 })
@@ -1151,7 +1152,7 @@ const ALL_TAGS = ['frontend', 'backend', 'design', 'bug', 'feature', 'infra', 'r
 
 const allTagOptions = computed(() => {
   const extra = props.task.tags ?? []
-  return [...new Set([...ALL_TAGS, ...extra])]
+  return [...new Set([...ALL_TAGS, ...props.allTags, ...extra])]
 })
 const filteredTagOptions = computed(() => {
   const q = tagSearch.value.trim().toLowerCase()
@@ -1364,7 +1365,7 @@ function submitSubtaskReply(commentId) {
 
 const subtaskAllTagOptions = computed(() => {
   const extra = openSubtask.value?.tags ?? []
-  return [...new Set([...ALL_TAGS, ...extra])]
+  return [...new Set([...ALL_TAGS, ...props.allTags, ...extra])]
 })
 const subtaskFilteredTagOptions = computed(() => {
   const q = subtaskTagSearch.value.trim().toLowerCase()

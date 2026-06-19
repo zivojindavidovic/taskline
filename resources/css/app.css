@@ -314,6 +314,7 @@ input, textarea, select { font-family: inherit; color: var(--fg); }
 
 /* ── Cards ───────────────────────────────────────────────────────────── */
 .card {
+  position: relative;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -326,9 +327,40 @@ input, textarea, select { font-family: inherit; color: var(--fg); }
   transition: border-color 80ms, box-shadow 80ms;
 }
 .card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+.card[draggable="true"] { cursor: grab; }
+.card[draggable="true"]:active { cursor: grabbing; }
 .card.dragging { opacity: 0.4; }
 .card.completed { opacity: 0.65; }
 .card.completed .card-title { text-decoration: line-through; color: var(--fg-muted); }
+
+/* Reorder kebab — hidden until the card is hovered or its menu is open. */
+.card-menu {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 80ms;
+}
+.card:hover .card-menu { opacity: 1; }
+.card-menu-btn {
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Drop indicator — an accent line in the gap above/below the hovered card. */
+.card.drop-before::before,
+.card.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.card.drop-before::before { top: -5px; }
+.card.drop-after::after { bottom: -5px; }
 
 .card-id-row {
   display: flex;

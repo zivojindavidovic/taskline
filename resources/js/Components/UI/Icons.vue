@@ -46,6 +46,8 @@ export const CopyIcon     = ic('<rect x="5" y="5" width="8" height="8" rx="1"/><
 export const LinkIcon     = ic('<path d="M9 4.5h2A2.5 2.5 0 0 1 13.5 7v0A2.5 2.5 0 0 1 11 9.5H9M7 11.5H5A2.5 2.5 0 0 1 2.5 9v0A2.5 2.5 0 0 1 5 6.5h2M5.5 8h5"/>')
 export const ArrowRightIcon = ic('<path d="M3 8h10M9 4l4 4-4 4"/>')
 export const ArrowLeftIcon  = ic('<path d="M13 8H3M7 4l-4 4 4 4"/>')
+export const ArrowUpIcon    = ic('<path d="M8 13V3M4 7l4-4 4 4"/>')
+export const ArrowDownIcon  = ic('<path d="M8 3v10M4 9l4 4 4-4"/>')
 export const FlagIcon     = ic('<path d="M3.5 13V3M3.5 3h7l-1.5 2.5L10.5 8h-7"/>')
 export const FilterIcon   = ic('<path d="M2 3h12l-4.5 5.5V13l-3-1.5V8.5L2 3z"/>')
 export const BellIcon     = ic('<path d="M4 11V8a4 4 0 0 1 8 0v3l1 1.5H3L4 11z"/><path d="M6.5 14a1.5 1.5 0 0 0 3 0"/>')

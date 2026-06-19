@@ -102,13 +102,18 @@
       @drop.prevent="onDrop"
     >
       <TaskCard
-        v-for="task in tasks"
+        v-for="(task, ti) in tasks"
         :key="task.id"
         :task="task"
+        :index="ti"
+        :count="tasks.length"
+        :locked="locked"
         :dragging="draggingId === task.id"
         @open="$emit('openTask', $event)"
         @dragStart="$emit('dragStart', $event)"
         @dragEnd="$emit('dragEnd')"
+        @card-drop="(id, place) => $emit('card-drop', id, place)"
+        @move="(id, dir) => $emit('card-move', id, dir)"
       />
 
       <!-- Empty column drop zone -->
@@ -137,7 +142,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, watch } from 'vue'
 import TaskCard from './TaskCard.vue'
 import DropdownMenu from '@/Components/UI/DropdownMenu.vue'
 import MenuItem from '@/Components/UI/MenuItem.vue'
@@ -154,7 +159,7 @@ const props = defineProps({
 })
 const emit = defineEmits([
   'addTask', 'openTask', 'dragStart', 'dragEnd', 'drop', 'rename', 'delete', 'recolor',
-  'move', 'colDragStart', 'colDragEnd', 'colDrop',
+  'move', 'colDragStart', 'colDragEnd', 'colDrop', 'card-drop', 'card-move',
 ])
 
 // Palette offered when recoloring a column via its header dot.
@@ -168,6 +173,10 @@ const COLUMN_COLORS = [
 
 // Task drag-over highlight
 const dragOver = ref(false)
+
+// A card dropped onto a sibling card stops propagation, so the body's own drop
+// never clears this highlight. Reset it whenever any task drag finishes.
+watch(() => props.draggingId, (v) => { if (v == null) dragOver.value = false })
 
 function onDragLeave(e) {
   if (!e.currentTarget.contains(e.relatedTarget)) {

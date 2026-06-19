@@ -246,6 +246,7 @@
         @addTask="openNewTask"
         @openTask="openTask"
         @moveTask="moveTask"
+        @reorderTasks="reorderTasks"
         @addColumn="addColumn"
         @renameColumn="renameColumn"
         @deleteColumn="deleteColumn"
@@ -313,6 +314,7 @@
       :allUsers="allUsers"
       :allProjects="allProjects"
       :allSprints="sprints"
+      :allTags="allTags"
       :project="project"
       :locked="currentSprint?.locked ?? false"
       @close="closeTask"
@@ -342,6 +344,7 @@
       :columns="columns"
       :defaultColumn="defaultColumnId"
       :allUsers="allUsers"
+      :allTags="allTags"
       @close="showNewTask = false"
     />
 
@@ -394,6 +397,7 @@ const props = defineProps({
   tasks:         { type: Array,  default: () => [] },
   allUsers:      { type: Array,  default: () => [] },
   allProjects:   { type: Array,  default: () => [] },
+  allTags:       { type: Array,  default: () => [] },
   savedFilters:  {
     type: Object,
     default: () => ({
@@ -789,6 +793,9 @@ const tasksByColumn = computed(() => {
   filteredTasks.value.forEach(t => {
     if (t.board_column_id && m[t.board_column_id]) m[t.board_column_id].push(t)
   })
+  Object.values(m).forEach(list =>
+    list.sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || (a.id - b.id))
+  )
   return m
 })
 
@@ -989,6 +996,29 @@ function reorderColumns(orderedIds) {
     preserveScroll: true,
     preserveState: true,
     only: ['columns'],
+  })
+}
+
+// Persist a new top-to-bottom card order for one column. `orderedIds` are the
+// internal task ids that should live in `columnId`, in their new order; the
+// backend addresses tasks + columns by uuid. We optimistically rewrite the
+// affected cards' position (and column, for a card dragged in from elsewhere)
+// so the board doesn't blink, then reload `tasks` from the server.
+function reorderTasks(columnId, orderedIds) {
+  const colUuid = findColumnUuid(columnId)
+  const order   = orderedIds.map(id => findTaskUuid(id))
+  const prev    = localTasks.value
+
+  const rank = new Map(orderedIds.map((id, i) => [id, i]))
+  localTasks.value = localTasks.value.map(t =>
+    rank.has(t.id) ? { ...t, board_column_id: columnId, position: rank.get(t.id) } : t
+  )
+
+  router.patch(route('columns.tasks.reorder', colUuid), { order }, {
+    preserveScroll: true,
+    preserveState: true,
+    only: ['tasks'],
+    onError: () => { localTasks.value = prev },
   })
 }
 </script>

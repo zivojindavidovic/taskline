@@ -69,6 +69,7 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::patch('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
     Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
     Route::post('/tasks/{task}/move', [TaskController::class, 'move'])->name('tasks.move');
+    Route::patch('/columns/{column}/tasks/reorder', [TaskController::class, 'reorder'])->name('columns.tasks.reorder');
     Route::post('/tasks/{task}/complete', [TaskController::class, 'complete'])->name('tasks.complete');
     Route::post('/tasks/{task}/uncomplete', [TaskController::class, 'uncomplete'])->name('tasks.uncomplete');
     Route::post('/tasks/{task}/subtasks', [TaskController::class, 'storeSubtask'])->name('tasks.subtasks.store');

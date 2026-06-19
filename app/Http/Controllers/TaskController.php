@@ -4,18 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Events\TaskCreated;
 use App\Events\TaskUpdated;
+use App\Models\BoardColumn;
 use App\Models\Project;
 use App\Models\Sprint;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Services\ParticipantService;
+use App\Services\TagService;
 use App\Services\TaskActivityService;
 use App\Services\TaskService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -25,6 +29,7 @@ class TaskController extends Controller
         private TaskService $taskService,
         private ParticipantService $participantService,
         private TaskActivityService $activityService,
+        private TagService $tagService,
     ) {}
 
     public function store(Request $request): RedirectResponse
@@ -62,16 +67,31 @@ class TaskController extends Controller
 
         $taskNum = $project->tasks()->count() + 1;
 
+        // New cards land at the bottom of their column. Position is column-scoped
+        // and only top-level tasks are board cards, so the next slot is one past
+        // the current max within that column (or 0 for a columnless/backlog task).
+        $position = 0;
+        if (!empty($data['board_column_id'])) {
+            $max = Task::where('board_column_id', $data['board_column_id'])
+                ->whereNull('parent_task_id')
+                ->max('position');
+            $position = $max === null ? 0 : ((int) $max) + 1;
+        }
+
         $task = Task::create([
             ...collect($data)->except(['files', 'assignee_ids'])->all(),
             'key'         => $project->key.'-'.$taskNum,
             'created_by'  => auth()->id(),
             'assignee_id' => $assigneeIds[0] ?? ($data['assignee_id'] ?? null),
+            'position'    => $position,
         ]);
 
         if (!empty($assigneeIds)) {
             $this->taskService->setAssignees($task, $assigneeIds, auth()->id());
         }
+
+        // Any tag typed on a new task joins the workspace's global pool forever.
+        $this->tagService->registerForWorkspace($project->workspace_id, $data['tags'] ?? []);
 
         if ($request->hasFile('files')) {
             foreach ($request->file('files') as $file) {
@@ -129,6 +149,10 @@ class TaskController extends Controller
         ]);
 
         $this->taskService->update($task, $data, auth()->id());
+
+        if (array_key_exists('tags', $data)) {
+            $this->tagService->registerForWorkspace($task->project->workspace_id, $data['tags'] ?? []);
+        }
 
         return back();
     }
@@ -218,6 +242,7 @@ class TaskController extends Controller
             'sprints'     => $sprints,
             'allUsers'    => $allUsers,
             'allProjects' => $allProjects,
+            'allTags'     => $this->tagService->allForWorkspace($workspace->id),
             'locked'      => $locked,
         ]);
     }
@@ -229,6 +254,86 @@ class TaskController extends Controller
         ]);
 
         $this->taskService->update($task, $data, auth()->id());
+
+        return back();
+    }
+
+    /**
+     * Persist a new top-to-bottom card order for one board column.
+     *
+     * The client sends the full ordered list of task UUIDs that should live in
+     * `$column` (`order`); the server rewrites each task's `position` to its
+     * index and sets its `board_column_id` to this column. That single contract
+     * backs both within-column drag-reorder / "Move up / Move down" and a card
+     * dragged in from another column (it simply appears in the destination's
+     * order). The whole rewrite runs in a transaction, so it's atomic and
+     * idempotent — mirrors BoardColumnController::reorder on the vertical axis.
+     */
+    public function reorder(Request $request, BoardColumn $column): RedirectResponse
+    {
+        $project = $column->project;
+        $this->authorizeProjectAccess($project);
+
+        $validated = $request->validate([
+            'order'   => ['required', 'array', 'min:1'],
+            'order.*' => ['string'],
+        ]);
+
+        $order = collect($validated['order']);
+
+        // Resolve UUIDs to top-level tasks in this column's project. Scoping to
+        // the project (not just the column) is what lets a card dragged from a
+        // sibling column be folded into this order in one call, while still
+        // rejecting duplicates and ids from another board / project.
+        $tasks = Task::where('project_id', $project->id)
+            ->whereNull('parent_task_id')
+            ->whereIn('uuid', $order->all())
+            ->get()
+            ->keyBy('uuid');
+
+        $isValid = $order->unique()->count() === $order->count()
+            && $order->every(fn ($uuid) => $tasks->has($uuid));
+
+        if (! $isValid) {
+            throw ValidationException::withMessages([
+                'order' => 'The order must list tasks from this project exactly once.',
+            ]);
+        }
+
+        $movedAcrossColumns = [];
+
+        DB::transaction(function () use ($order, $tasks, $column, &$movedAcrossColumns) {
+            $order->each(function ($uuid, $index) use ($tasks, $column, &$movedAcrossColumns) {
+                $task = $tasks->get($uuid);
+                $changedColumn = (int) $task->board_column_id !== (int) $column->id;
+
+                if ((int) $task->position !== $index || $changedColumn) {
+                    $task->update([
+                        'position'        => $index,
+                        'board_column_id' => $column->id,
+                    ]);
+                }
+
+                if ($changedColumn) {
+                    $movedAcrossColumns[] = $task;
+                }
+            });
+        });
+
+        \App\Models\AuditLog::create([
+            'user_id'    => auth()->id(),
+            'project_id' => $project->id,
+            'action'     => 'task.reordered',
+            'meta'       => ['column' => $column->name, 'order' => $order->all()],
+        ]);
+
+        // Only cross-column moves carry meaning for other viewers (a card jumped
+        // boards); broadcast those as ordinary task updates so their cards relocate.
+        // A pure within-column shuffle is persisted but intentionally not broadcast.
+        foreach ($movedAcrossColumns as $task) {
+            $task->refresh()->load(['assignee', 'assignees', 'boardColumn:id,name,color']);
+            broadcast(new TaskUpdated($task))->toOthers();
+        }
 
         return back();
     }
@@ -346,6 +451,10 @@ class TaskController extends Controller
 
         $this->taskService->updateSubtask($task, $subtask, $data, auth()->id());
 
+        if (array_key_exists('tags', $data)) {
+            $this->tagService->registerForWorkspace($task->project->workspace_id, $data['tags'] ?? []);
+        }
+
         return back();
     }
 
@@ -361,6 +470,17 @@ class TaskController extends Controller
     private function authorizeTaskAccess(Task $task): void
     {
         abort_unless($this->canAccessTask($task), 403);
+    }
+
+    /** Only a project's owner or members may reshape its board. */
+    private function authorizeProjectAccess(Project $project): void
+    {
+        $user = auth()->user();
+        abort_unless(
+            $user && ($project->owner_id === $user->id
+                || $project->members()->where('users.id', $user->id)->exists()),
+            403
+        );
     }
 
     /**
