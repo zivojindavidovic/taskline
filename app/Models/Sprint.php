@@ -11,12 +11,13 @@ class Sprint extends Model
 {
     use HasUuidv7;
 
-    protected $fillable = ['project_id', 'name', 'start_date', 'end_date', 'status', 'locked'];
+    protected $fillable = ['project_id', 'name', 'start_date', 'end_date', 'goal', 'status', 'locked', 'summary'];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date'   => 'date',
         'locked'     => 'boolean',
+        'summary'    => 'array',
     ];
 
     public function project(): BelongsTo

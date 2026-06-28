@@ -91,7 +91,10 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::get('/tasks/{task}/comments/mentionable-users', [TaskCommentController::class, 'mentionableUsers'])->name('tasks.comments.mentionable');
 
     // Sprints
+    Route::get('/sprints', [SprintController::class, 'index'])->name('sprints.index');
     Route::post('/projects/{project}/sprints', [SprintController::class, 'store'])->name('sprints.store');
+    Route::patch('/sprints/{sprint}', [SprintController::class, 'update'])->name('sprints.update');
+    Route::delete('/sprints/{sprint}', [SprintController::class, 'destroy'])->name('sprints.destroy');
     Route::post('/sprints/{sprint}/lock', [SprintController::class, 'lock'])->name('sprints.lock');
     Route::post('/sprints/{sprint}/unlock', [SprintController::class, 'unlock'])->name('sprints.unlock');
     Route::post('/sprints/{sprint}/complete', [SprintController::class, 'complete'])->name('sprints.complete');

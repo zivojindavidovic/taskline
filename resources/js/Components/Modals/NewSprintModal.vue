@@ -1,5 +1,17 @@
 <template>
-  <AppModal :show="show" title="New sprint" @close="close">
+  <AppModal :show="show" :title="title" @close="close">
+    <!-- Project picker (only when creating from the workspace-wide Sprints page) -->
+    <div v-if="showPicker" class="flex flex-col gap-1">
+      <label class="text-xs font-medium" style="color:var(--fg-muted)">Project</label>
+      <select
+        v-model="form.project"
+        class="w-full h-10 px-3 rounded-lg border text-sm"
+        style="border-color:var(--border);background:var(--bg-panel);color:var(--fg)"
+      >
+        <option v-for="p in projects" :key="p.uuid" :value="p.uuid">{{ p.name }}</option>
+      </select>
+    </div>
+
     <!-- Sprint name -->
     <div class="flex flex-col gap-1">
       <label class="text-xs font-medium" style="color:var(--fg-muted)">Sprint name</label>
@@ -57,11 +69,11 @@
       </button>
       <button
         type="button"
-        :disabled="!form.name.trim() || form.processing"
+        :disabled="!canSubmit"
         class="btn-primary h-8 px-4 text-sm rounded-lg"
         @click="submit"
       >
-        Create sprint
+        {{ submitLabel }}
         <kbd class="ml-1 text-[10px] px-1 rounded" style="background:rgba(255,255,255,.15)">⌘↵</kbd>
       </button>
     </template>
@@ -69,49 +81,90 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, computed, nextTick } from 'vue'
 import { useForm } from '@inertiajs/vue3'
 import AppModal from '@/Components/UI/AppModal.vue'
 
 const props = defineProps({
-  show:      { type: Boolean, required: true },
-  projectId: { type: Number,  required: true },
+  show:      { type: Boolean,        required: true },
+  // Fixed target project (board flow). Optional — the Sprints page picks a
+  // project via the in-modal picker instead.
+  projectId: { type: [Number, String], default: null },
+  // When set, the modal edits this sprint instead of creating a new one.
+  sprint:    { type: Object,         default: null },
+  // Candidate projects for the picker (Sprints page flow).
+  projects:  { type: Array,          default: () => [] },
 })
 const emit = defineEmits(['close'])
 
 const nameInput = ref(null)
 
-const today = new Date().toISOString().split('T')[0]
-const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0]
+const today    = () => new Date().toISOString().split('T')[0]
+const twoWeeks = () => new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0]
 
 const form = useForm({
   name:       '',
-  start_date: today,
-  end_date:   twoWeeks,
+  start_date: today(),
+  end_date:   twoWeeks(),
   goal:       '',
+  project:    null, // uuid — only used by the picker flow
 })
 
-watch(() => props.show, val => {
-  if (val) {
-    form.reset()
+const isEdit     = computed(() => !!props.sprint)
+const title      = computed(() => (isEdit.value ? 'Edit sprint' : 'New sprint'))
+const submitLabel = computed(() => (isEdit.value ? 'Save changes' : 'Create sprint'))
+const showPicker = computed(() => !isEdit.value && !props.projectId && props.projects.length > 0)
+
+// A create needs a target project (fixed or picked); an edit always has one.
+const targetProject = computed(() => props.projectId || form.project)
+const canSubmit = computed(() =>
+  !!form.name.trim() && !form.processing && (isEdit.value || !!targetProject.value)
+)
+
+watch(() => props.show, (val) => {
+  if (!val) return
+  form.clearErrors()
+  if (isEdit.value) {
+    const s = props.sprint
+    form.name       = s.name ?? ''
+    form.start_date = s.start_date ?? ''
+    form.end_date   = s.end_date ?? ''
+    form.goal       = s.goal ?? ''
+    form.project    = s.project_uuid ?? null
+  } else {
     form.name       = ''
-    form.start_date = new Date().toISOString().split('T')[0]
-    form.end_date   = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0]
+    form.start_date = today()
+    form.end_date   = twoWeeks()
     form.goal       = ''
-    nextTick(() => nameInput.value?.focus())
+    form.project    = props.projectId || props.projects[0]?.uuid || null
   }
+  nextTick(() => nameInput.value?.focus())
 })
 
 function submit() {
-  if (!form.name.trim()) return
-  form.post(route('sprints.store', props.projectId), {
-    preserveScroll: true,
-    onSuccess: () => close(),
-  })
+  if (!canSubmit.value) return
+
+  // Sprint identity (project) lives in the URL; the body only carries fields.
+  form.transform((d) => ({
+    name:       d.name,
+    start_date: d.start_date || null,
+    end_date:   d.end_date || null,
+    goal:       d.goal || null,
+  }))
+
+  const opts = { preserveScroll: true, onSuccess: () => close() }
+
+  if (isEdit.value) {
+    form.patch(route('sprints.update', props.sprint.uuid), opts)
+  } else {
+    form.post(route('sprints.store', targetProject.value), opts)
+  }
 }
 
 function close() {
+  form.transform((d) => d) // reset any transform
   form.reset()
+  form.clearErrors()
   emit('close')
 }
 </script>

@@ -75,6 +75,9 @@
         <div class="nav-section-label" style="margin-top:8px">
           <span>Workspace</span>
         </div>
+        <NavItem :href="route('sprints.index')" :active="isActive('sprints.index')">
+          <LightningIcon class="nav-icon" /> Sprints
+        </NavItem>
         <NavItem :href="route('members')" :active="isActive('members')">
           <UserIcon class="nav-icon" /> Members
         </NavItem>
@@ -146,7 +149,7 @@ import { useToast } from '@/composables/useToast'
 import {
   ChevronIcon, HomeIcon, InboxIcon, UserIcon,
   PlusIcon, HistoryIcon, SettingsIcon, LogoutIcon,
-  MenuIcon, CloseIcon,
+  MenuIcon, CloseIcon, LightningIcon,
 } from '@/Components/UI/Icons.vue'
 
 defineProps({
