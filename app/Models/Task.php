@@ -111,6 +111,8 @@ class Task extends Model
             'comments.mentionedUsers:id,name,email,avatar_color',
             'comments.replies' => fn ($q) => $q->oldest(),
             'comments.replies.user:id,name,email,avatar_color',
+            'attachments' => fn ($q) => $q->latest(),
+            'attachments.uploader:id,name,avatar_color',
         ];
     }
 

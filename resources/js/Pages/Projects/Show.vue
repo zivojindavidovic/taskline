@@ -957,10 +957,13 @@ function handleSubtaskUpdate(subtaskId, data) {
   })
 }
 
-function uploadAttachment(file) {
+function uploadAttachment(file, taskId = activeTask.value?.id) {
   const form = new FormData()
   form.append('file', file)
-  router.post(route('tasks.attachments.store', activeTask.value.uuid), form, { preserveScroll: true })
+  const taskUuid = taskId === activeTask.value?.id
+    ? activeTask.value.uuid
+    : findSubtaskUuid(taskId)
+  router.post(route('tasks.attachments.store', taskUuid), form, { preserveScroll: true })
 }
 
 function removeAttachment(attachmentId) {

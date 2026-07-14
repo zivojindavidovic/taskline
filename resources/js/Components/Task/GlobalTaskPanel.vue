@@ -187,10 +187,11 @@ function removeSubtask(subtaskId) {
 function handleSubtaskUpdate(subtaskId, data) {
   router.patch(route('tasks.subtasks.update', [subtaskParentUuid(subtaskId), subtaskUuid(subtaskId)]), data, opts(refetch))
 }
-function uploadAttachment(file) {
+function uploadAttachment(file, taskId = task.value?.id) {
   const form = new FormData()
   form.append('file', file)
-  router.post(route('tasks.attachments.store', task.value.uuid), form, opts(refetch))
+  const taskUuid = taskId === task.value?.id ? task.value.uuid : subtaskUuid(taskId)
+  router.post(route('tasks.attachments.store', taskUuid), form, opts(refetch))
 }
 function removeAttachment(attachmentId) {
   router.delete(route('attachments.destroy', attachmentId), opts(refetch))

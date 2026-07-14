@@ -1316,30 +1316,15 @@ async function resolveAccess(req, approved) {
   }
 }
 
-// Subtask local state (attachments + comments — stored in-memory, not persisted)
-const subtaskLocalData = reactive({})
-function getSubtaskData(id) {
-  if (!subtaskLocalData[id]) subtaskLocalData[id] = { attachments: [], comments: [] }
-  return subtaskLocalData[id]
-}
-const openSubtaskAttachments = computed(() => {
-  if (!openSubtask.value) return []
-  const local = subtaskLocalData[openSubtask.value.id]?.attachments ?? []
-  return [...(openSubtask.value.attachments ?? []), ...local]
-})
+const openSubtaskAttachments = computed(() => openSubtask.value?.attachments ?? [])
 const openSubtaskComments = computed(() => openSubtask.value?.comments ?? [])
 const subtaskNewComment = ref('')
 function onSubtaskAttachmentUpload(file) {
   if (!openSubtask.value) return
-  getSubtaskData(openSubtask.value.id).attachments.push({
-    id: Date.now(), name: file.name, size: file.size,
-    url: URL.createObjectURL(file),
-  })
+  emit('attachmentUpload', file, openSubtask.value.id)
 }
 function onSubtaskAttachmentRemove(id) {
-  if (!openSubtask.value) return
-  const data = getSubtaskData(openSubtask.value.id)
-  data.attachments = data.attachments.filter(a => a.id !== id)
+  emit('attachmentRemove', id)
 }
 function submitSubtaskComment() {
   const body = subtaskNewComment.value.trim()

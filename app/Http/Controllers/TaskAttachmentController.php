@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\TaskUpdated;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use Illuminate\Http\RedirectResponse;
@@ -28,14 +29,40 @@ class TaskAttachmentController extends Controller
             'size'          => $file->getSize(),
         ]);
 
+        $this->broadcastAttachmentChange($task);
+
         return back();
     }
 
     public function destroy(TaskAttachment $attachment): RedirectResponse
     {
+        $task = $attachment->task;
         Storage::disk($attachment->disk)->delete($attachment->path);
         $attachment->delete();
 
+        $this->broadcastAttachmentChange($task);
+
         return back();
+    }
+
+    /**
+     * Broadcast the top-level task so every viewer receives an attachment
+     * change, including an attachment that belongs to a nested subtask.
+     */
+    private function broadcastAttachmentChange(Task $task): void
+    {
+        while ($task->parent_task_id) {
+            $task = $task->parent()->firstOrFail();
+        }
+
+        $task->load([
+            'assignee:id,name,email,avatar_color',
+            'assignees:id,name,email,avatar_color',
+            'attachments' => fn ($q) => $q->latest(),
+            'attachments.uploader:id,name,avatar_color',
+        ]);
+        $task->loadSubtaskTree();
+
+        broadcast(new TaskUpdated($task))->toOthers();
     }
 }
