@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Events\TaskUpdated;
 use App\Models\BoardColumn;
 use App\Models\Project;
+use App\Models\Sprint;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
@@ -123,6 +124,23 @@ class TaskReorderTest extends TestCase
         $this->assertSame($this->doing->id, $a->board_column_id);
         $this->assertSame(0, $a->position);
         $this->assertSame(1, $this->doingTask->fresh()->position);
+    }
+
+    public function test_task_in_a_locked_sprint_can_move_to_another_column(): void
+    {
+        $sprint = Sprint::create([
+            'project_id' => $this->project->id,
+            'name'       => 'Locked Sprint',
+            'locked'     => true,
+        ]);
+        [$task] = $this->todoTasks;
+        $task->update(['sprint_id' => $sprint->id]);
+
+        $this->actingAs($this->owner)
+            ->post(route('tasks.move', $task), ['board_column_id' => $this->doing->id])
+            ->assertRedirect();
+
+        $this->assertSame($this->doing->id, $task->fresh()->board_column_id);
     }
 
     public function test_partial_order_leaves_unlisted_cards_untouched(): void

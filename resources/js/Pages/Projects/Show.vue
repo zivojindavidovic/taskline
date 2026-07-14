@@ -234,7 +234,7 @@
       style="background:var(--bg-sunken);border-bottom:1px solid var(--border);color:var(--fg-muted)"
     >
       <LockIcon class="w-3.5 h-3.5" />
-      This sprint is locked. Tasks are read-only.
+      This sprint is locked. Task details are read-only, but tasks can still move between columns.
     </div>
 
     <!-- Board view -->

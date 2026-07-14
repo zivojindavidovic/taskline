@@ -97,17 +97,18 @@
     <div
       class="column-body"
       :class="{ 'drag-over': dragOver }"
-      @dragover.prevent="!locked && !colDragId && (dragOver = true)"
+      @dragover.prevent="!colDragId && (dragOver = true)"
       @dragleave="onDragLeave"
       @drop.prevent="onDrop"
     >
+      <!-- Sprint locking keeps task details immutable, not their board progress. -->
       <TaskCard
         v-for="(task, ti) in tasks"
         :key="task.id"
         :task="task"
         :index="ti"
         :count="tasks.length"
-        :locked="locked"
+        :locked="false"
         :dragging="draggingId === task.id"
         @open="$emit('openTask', $event)"
         @dragStart="$emit('dragStart', $event)"
@@ -250,4 +251,3 @@ function tryDelete() {
   if (props.tasks.length === 0) emit('delete', props.column.id)
 }
 </script>
-
