@@ -6,7 +6,7 @@
 #   2. docker compose pull
 #   3. docker compose up -d
 #
-# app and reverb share the same published image.
+# app, reverb and scheduler share the same published image.
 # =============================================================================
 
 services:
@@ -32,6 +32,20 @@ services:
     environment:
       TASKLINE_INIT: "0"
     volumes:
+      - taskline-storage:/var/www/html/storage
+    depends_on: [app]
+    networks: [taskline]
+
+  # Keep a single scheduler replica so each scheduled command runs once.
+  scheduler:
+    image: ${TASKLINE_IMAGE:-zivojindavidovic/taskline:latest}
+    restart: unless-stopped
+    command: php artisan schedule:work
+    env_file: .env
+    environment:
+      TASKLINE_INIT: "0"
+    volumes:
+      # Shares the persisted APP_KEY when it is generated automatically.
       - taskline-storage:/var/www/html/storage
     depends_on: [app]
     networks: [taskline]

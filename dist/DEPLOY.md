@@ -2,7 +2,7 @@
 
 Taskline ships as a single Docker image containing the PHP app, the compiled
 frontend (`public/build`) and PHP dependencies (`vendor`). The same image runs
-the web app and the Reverb websocket server.
+the web app, the Reverb websocket server, and the Laravel scheduler.
 
 ## What's in the box
 
@@ -16,7 +16,7 @@ it governs the Docker build context.
 | `dist/entrypoint.sh` | Migrations, storage/asset setup, config cache on start |
 | `dist/php/taskline.ini` | Production PHP/OPcache settings |
 | `dist/nginx/taskline.conf` | nginx vhost (php-fpm + `/app` Reverb proxy) |
-| `dist/docker-compose.yml` | Full self-hosted stack (app, reverb, nginx, postgres) |
+| `dist/docker-compose.yml` | Full self-hosted stack (app, reverb, scheduler, nginx, postgres) |
 | `dist/.env.docker.example` | Environment template |
 | `dist/BACKUP.md` | Backup & restore procedure (database, storage, `.env`) |
 | `dist/build-and-push.sh` | Multi-arch build (`linux/amd64,linux/arm64`) + push to the registry |
@@ -66,6 +66,9 @@ left it blank.
 
 ### Things the stack does for you
 - **Migrations** run automatically (only on the `app` container).
+- **Scheduled commands** are evaluated by the one `scheduler` container, which
+  runs `php artisan schedule:work`. Do not scale this service beyond one
+  replica, otherwise a command could run more than once.
 - **`public/` assets** are synced into a shared volume that nginx serves, so an
   image upgrade ships new assets automatically.
 - **Websockets** go `browser → nginx /app → reverb:8081`; PHP publishes events
